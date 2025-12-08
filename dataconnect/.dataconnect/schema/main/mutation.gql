@@ -1,0 +1,786 @@
+extend type Mutation {
+  """
+  ✨ Insert a single `AISuggestion` into the table and return its key. Columns not specified in `data` will receive defaults (e.g. `null`).
+  """
+  aISuggestion_insert(
+    """
+    Data object to insert into the table.
+    """
+    data: AISuggestion_Data!
+  ): AISuggestion_KeyOutput! @fdc_generated(from: "AISuggestion", purpose: INSERT_SINGLE)
+  """
+  ✨ Insert a single `ApiSubmission` into the table and return its key. Columns not specified in `data` will receive defaults (e.g. `null`).
+  """
+  apiSubmission_insert(
+    """
+    Data object to insert into the table.
+    """
+    data: ApiSubmission_Data!
+  ): ApiSubmission_KeyOutput! @fdc_generated(from: "ApiSubmission", purpose: INSERT_SINGLE)
+  """
+  ✨ Insert a single `ChatMessage` into the table and return its key. Columns not specified in `data` will receive defaults (e.g. `null`).
+  """
+  chatMessage_insert(
+    """
+    Data object to insert into the table.
+    """
+    data: ChatMessage_Data!
+  ): ChatMessage_KeyOutput! @fdc_generated(from: "ChatMessage", purpose: INSERT_SINGLE)
+  """
+  ✨ Insert a single `ChatRoom` into the table and return its key. Columns not specified in `data` will receive defaults (e.g. `null`).
+  """
+  chatRoom_insert(
+    """
+    Data object to insert into the table.
+    """
+    data: ChatRoom_Data!
+  ): ChatRoom_KeyOutput! @fdc_generated(from: "ChatRoom", purpose: INSERT_SINGLE)
+  """
+  ✨ Insert a single `Comment` into the table and return its key. Columns not specified in `data` will receive defaults (e.g. `null`).
+  """
+  comment_insert(
+    """
+    Data object to insert into the table.
+    """
+    data: Comment_Data!
+  ): Comment_KeyOutput! @fdc_generated(from: "Comment", purpose: INSERT_SINGLE)
+  """
+  ✨ Insert a single `User` into the table and return its key. Columns not specified in `data` will receive defaults (e.g. `null`).
+  """
+  user_insert(
+    """
+    Data object to insert into the table.
+    """
+    data: User_Data!
+  ): User_KeyOutput! @fdc_generated(from: "User", purpose: INSERT_SINGLE)
+  """
+  ✨ Insert a single `Vote` into the table and return its key. Columns not specified in `data` will receive defaults (e.g. `null`).
+  """
+  vote_insert(
+    """
+    Data object to insert into the table.
+    """
+    data: Vote_Data!
+  ): Vote_KeyOutput! @fdc_generated(from: "Vote", purpose: INSERT_SINGLE)
+  """
+  ✨ Insert `AISuggestion` objects into the table and return their keys. Columns not specified in `data` will receive defaults (e.g. `null`).
+  """
+  aISuggestion_insertMany(
+    """
+    List of data objects to insert into the table.
+    """
+    data: [AISuggestion_Data!]!
+  ): [AISuggestion_KeyOutput!]! @fdc_generated(from: "AISuggestion", purpose: INSERT_MULTIPLE)
+  """
+  ✨ Insert `ApiSubmission` objects into the table and return their keys. Columns not specified in `data` will receive defaults (e.g. `null`).
+  """
+  apiSubmission_insertMany(
+    """
+    List of data objects to insert into the table.
+    """
+    data: [ApiSubmission_Data!]!
+  ): [ApiSubmission_KeyOutput!]! @fdc_generated(from: "ApiSubmission", purpose: INSERT_MULTIPLE)
+  """
+  ✨ Insert `ChatMessage` objects into the table and return their keys. Columns not specified in `data` will receive defaults (e.g. `null`).
+  """
+  chatMessage_insertMany(
+    """
+    List of data objects to insert into the table.
+    """
+    data: [ChatMessage_Data!]!
+  ): [ChatMessage_KeyOutput!]! @fdc_generated(from: "ChatMessage", purpose: INSERT_MULTIPLE)
+  """
+  ✨ Insert `ChatRoom` objects into the table and return their keys. Columns not specified in `data` will receive defaults (e.g. `null`).
+  """
+  chatRoom_insertMany(
+    """
+    List of data objects to insert into the table.
+    """
+    data: [ChatRoom_Data!]!
+  ): [ChatRoom_KeyOutput!]! @fdc_generated(from: "ChatRoom", purpose: INSERT_MULTIPLE)
+  """
+  ✨ Insert `Comment` objects into the table and return their keys. Columns not specified in `data` will receive defaults (e.g. `null`).
+  """
+  comment_insertMany(
+    """
+    List of data objects to insert into the table.
+    """
+    data: [Comment_Data!]!
+  ): [Comment_KeyOutput!]! @fdc_generated(from: "Comment", purpose: INSERT_MULTIPLE)
+  """
+  ✨ Insert `User` objects into the table and return their keys. Columns not specified in `data` will receive defaults (e.g. `null`).
+  """
+  user_insertMany(
+    """
+    List of data objects to insert into the table.
+    """
+    data: [User_Data!]!
+  ): [User_KeyOutput!]! @fdc_generated(from: "User", purpose: INSERT_MULTIPLE)
+  """
+  ✨ Insert `Vote` objects into the table and return their keys. Columns not specified in `data` will receive defaults (e.g. `null`).
+  """
+  vote_insertMany(
+    """
+    List of data objects to insert into the table.
+    """
+    data: [Vote_Data!]!
+  ): [Vote_KeyOutput!]! @fdc_generated(from: "Vote", purpose: INSERT_MULTIPLE)
+  """
+  ✨ Insert or update a single `AISuggestion` into the table, based on the primary key. Returns the key of the newly inserted or existing updated `AISuggestion`.
+  """
+  aISuggestion_upsert(
+    """
+    Data object to insert or update if it already exists.
+    """
+    data: AISuggestion_Data!
+  ): AISuggestion_KeyOutput! @fdc_generated(from: "AISuggestion", purpose: UPSERT_SINGLE)
+  """
+  ✨ Insert or update a single `ApiSubmission` into the table, based on the primary key. Returns the key of the newly inserted or existing updated `ApiSubmission`.
+  """
+  apiSubmission_upsert(
+    """
+    Data object to insert or update if it already exists.
+    """
+    data: ApiSubmission_Data!
+  ): ApiSubmission_KeyOutput! @fdc_generated(from: "ApiSubmission", purpose: UPSERT_SINGLE)
+  """
+  ✨ Insert or update a single `ChatMessage` into the table, based on the primary key. Returns the key of the newly inserted or existing updated `ChatMessage`.
+  """
+  chatMessage_upsert(
+    """
+    Data object to insert or update if it already exists.
+    """
+    data: ChatMessage_Data!
+  ): ChatMessage_KeyOutput! @fdc_generated(from: "ChatMessage", purpose: UPSERT_SINGLE)
+  """
+  ✨ Insert or update a single `ChatRoom` into the table, based on the primary key. Returns the key of the newly inserted or existing updated `ChatRoom`.
+  """
+  chatRoom_upsert(
+    """
+    Data object to insert or update if it already exists.
+    """
+    data: ChatRoom_Data!
+  ): ChatRoom_KeyOutput! @fdc_generated(from: "ChatRoom", purpose: UPSERT_SINGLE)
+  """
+  ✨ Insert or update a single `Comment` into the table, based on the primary key. Returns the key of the newly inserted or existing updated `Comment`.
+  """
+  comment_upsert(
+    """
+    Data object to insert or update if it already exists.
+    """
+    data: Comment_Data!
+  ): Comment_KeyOutput! @fdc_generated(from: "Comment", purpose: UPSERT_SINGLE)
+  """
+  ✨ Insert or update a single `User` into the table, based on the primary key. Returns the key of the newly inserted or existing updated `User`.
+  """
+  user_upsert(
+    """
+    Data object to insert or update if it already exists.
+    """
+    data: User_Data!
+  ): User_KeyOutput! @fdc_generated(from: "User", purpose: UPSERT_SINGLE)
+  """
+  ✨ Insert or update a single `Vote` into the table, based on the primary key. Returns the key of the newly inserted or existing updated `Vote`.
+  """
+  vote_upsert(
+    """
+    Data object to insert or update if it already exists.
+    """
+    data: Vote_Data!
+  ): Vote_KeyOutput! @fdc_generated(from: "Vote", purpose: UPSERT_SINGLE)
+  """
+  ✨ Insert or update `AISuggestion` objects into the table, based on the primary key. Returns the key of the newly inserted or existing updated `AISuggestion`.
+  """
+  aISuggestion_upsertMany(
+    """
+    List of data objects to insert or update if it already exists.
+    """
+    data: [AISuggestion_Data!]!
+  ): [AISuggestion_KeyOutput!]! @fdc_generated(from: "AISuggestion", purpose: UPSERT_MULTIPLE)
+  """
+  ✨ Insert or update `ApiSubmission` objects into the table, based on the primary key. Returns the key of the newly inserted or existing updated `ApiSubmission`.
+  """
+  apiSubmission_upsertMany(
+    """
+    List of data objects to insert or update if it already exists.
+    """
+    data: [ApiSubmission_Data!]!
+  ): [ApiSubmission_KeyOutput!]! @fdc_generated(from: "ApiSubmission", purpose: UPSERT_MULTIPLE)
+  """
+  ✨ Insert or update `ChatMessage` objects into the table, based on the primary key. Returns the key of the newly inserted or existing updated `ChatMessage`.
+  """
+  chatMessage_upsertMany(
+    """
+    List of data objects to insert or update if it already exists.
+    """
+    data: [ChatMessage_Data!]!
+  ): [ChatMessage_KeyOutput!]! @fdc_generated(from: "ChatMessage", purpose: UPSERT_MULTIPLE)
+  """
+  ✨ Insert or update `ChatRoom` objects into the table, based on the primary key. Returns the key of the newly inserted or existing updated `ChatRoom`.
+  """
+  chatRoom_upsertMany(
+    """
+    List of data objects to insert or update if it already exists.
+    """
+    data: [ChatRoom_Data!]!
+  ): [ChatRoom_KeyOutput!]! @fdc_generated(from: "ChatRoom", purpose: UPSERT_MULTIPLE)
+  """
+  ✨ Insert or update `Comment` objects into the table, based on the primary key. Returns the key of the newly inserted or existing updated `Comment`.
+  """
+  comment_upsertMany(
+    """
+    List of data objects to insert or update if it already exists.
+    """
+    data: [Comment_Data!]!
+  ): [Comment_KeyOutput!]! @fdc_generated(from: "Comment", purpose: UPSERT_MULTIPLE)
+  """
+  ✨ Insert or update `User` objects into the table, based on the primary key. Returns the key of the newly inserted or existing updated `User`.
+  """
+  user_upsertMany(
+    """
+    List of data objects to insert or update if it already exists.
+    """
+    data: [User_Data!]!
+  ): [User_KeyOutput!]! @fdc_generated(from: "User", purpose: UPSERT_MULTIPLE)
+  """
+  ✨ Insert or update `Vote` objects into the table, based on the primary key. Returns the key of the newly inserted or existing updated `Vote`.
+  """
+  vote_upsertMany(
+    """
+    List of data objects to insert or update if it already exists.
+    """
+    data: [Vote_Data!]!
+  ): [Vote_KeyOutput!]! @fdc_generated(from: "Vote", purpose: UPSERT_MULTIPLE)
+  """
+  ✨ Update a single `AISuggestion` based on `id`, `key` or `first`, setting columns specified in `data`. Returns the key of the updated `AISuggestion` or `null` if not found.
+  """
+  aISuggestion_update(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: AISuggestion_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: AISuggestion_FirstRow
+
+    """
+    Data object containing fields to be updated.
+    """
+    data: AISuggestion_Data!
+  ): AISuggestion_KeyOutput @fdc_generated(from: "AISuggestion", purpose: UPDATE_SINGLE)
+  """
+  ✨ Update a single `ApiSubmission` based on `id`, `key` or `first`, setting columns specified in `data`. Returns the key of the updated `ApiSubmission` or `null` if not found.
+  """
+  apiSubmission_update(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: ApiSubmission_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: ApiSubmission_FirstRow
+
+    """
+    Data object containing fields to be updated.
+    """
+    data: ApiSubmission_Data!
+  ): ApiSubmission_KeyOutput @fdc_generated(from: "ApiSubmission", purpose: UPDATE_SINGLE)
+  """
+  ✨ Update a single `ChatMessage` based on `id`, `key` or `first`, setting columns specified in `data`. Returns the key of the updated `ChatMessage` or `null` if not found.
+  """
+  chatMessage_update(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: ChatMessage_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: ChatMessage_FirstRow
+
+    """
+    Data object containing fields to be updated.
+    """
+    data: ChatMessage_Data!
+  ): ChatMessage_KeyOutput @fdc_generated(from: "ChatMessage", purpose: UPDATE_SINGLE)
+  """
+  ✨ Update a single `ChatRoom` based on `id`, `key` or `first`, setting columns specified in `data`. Returns the key of the updated `ChatRoom` or `null` if not found.
+  """
+  chatRoom_update(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: ChatRoom_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: ChatRoom_FirstRow
+
+    """
+    Data object containing fields to be updated.
+    """
+    data: ChatRoom_Data!
+  ): ChatRoom_KeyOutput @fdc_generated(from: "ChatRoom", purpose: UPDATE_SINGLE)
+  """
+  ✨ Update a single `Comment` based on `id`, `key` or `first`, setting columns specified in `data`. Returns the key of the updated `Comment` or `null` if not found.
+  """
+  comment_update(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: Comment_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: Comment_FirstRow
+
+    """
+    Data object containing fields to be updated.
+    """
+    data: Comment_Data!
+  ): Comment_KeyOutput @fdc_generated(from: "Comment", purpose: UPDATE_SINGLE)
+  """
+  ✨ Update a single `User` based on `id`, `key` or `first`, setting columns specified in `data`. Returns the key of the updated `User` or `null` if not found.
+  """
+  user_update(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: User_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: User_FirstRow
+
+    """
+    Data object containing fields to be updated.
+    """
+    data: User_Data!
+  ): User_KeyOutput @fdc_generated(from: "User", purpose: UPDATE_SINGLE)
+  """
+  ✨ Update a single `Vote` based on `id`, `key` or `first`, setting columns specified in `data`. Returns the key of the updated `Vote` or `null` if not found.
+  """
+  vote_update(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: Vote_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: Vote_FirstRow
+
+    """
+    Data object containing fields to be updated.
+    """
+    data: Vote_Data!
+  ): Vote_KeyOutput @fdc_generated(from: "Vote", purpose: UPDATE_SINGLE)
+  """
+  ✨ Update `AISuggestion` objects matching `where` conditions (or `all`, if true) according to `data`. Returns the number of rows updated.
+  """
+  aISuggestion_updateMany(
+    """
+    Filter condition to specify which rows to update.
+    """
+    where: AISuggestion_Filter
+
+    """
+    Set to true to update all rows.
+    """
+    all: Boolean = false
+
+    """
+    Data object containing fields to update.
+    """
+    data: AISuggestion_Data!
+  ): Int! @fdc_generated(from: "AISuggestion", purpose: UPDATE_MULTIPLE)
+  """
+  ✨ Update `ApiSubmission` objects matching `where` conditions (or `all`, if true) according to `data`. Returns the number of rows updated.
+  """
+  apiSubmission_updateMany(
+    """
+    Filter condition to specify which rows to update.
+    """
+    where: ApiSubmission_Filter
+
+    """
+    Set to true to update all rows.
+    """
+    all: Boolean = false
+
+    """
+    Data object containing fields to update.
+    """
+    data: ApiSubmission_Data!
+  ): Int! @fdc_generated(from: "ApiSubmission", purpose: UPDATE_MULTIPLE)
+  """
+  ✨ Update `ChatMessage` objects matching `where` conditions (or `all`, if true) according to `data`. Returns the number of rows updated.
+  """
+  chatMessage_updateMany(
+    """
+    Filter condition to specify which rows to update.
+    """
+    where: ChatMessage_Filter
+
+    """
+    Set to true to update all rows.
+    """
+    all: Boolean = false
+
+    """
+    Data object containing fields to update.
+    """
+    data: ChatMessage_Data!
+  ): Int! @fdc_generated(from: "ChatMessage", purpose: UPDATE_MULTIPLE)
+  """
+  ✨ Update `ChatRoom` objects matching `where` conditions (or `all`, if true) according to `data`. Returns the number of rows updated.
+  """
+  chatRoom_updateMany(
+    """
+    Filter condition to specify which rows to update.
+    """
+    where: ChatRoom_Filter
+
+    """
+    Set to true to update all rows.
+    """
+    all: Boolean = false
+
+    """
+    Data object containing fields to update.
+    """
+    data: ChatRoom_Data!
+  ): Int! @fdc_generated(from: "ChatRoom", purpose: UPDATE_MULTIPLE)
+  """
+  ✨ Update `Comment` objects matching `where` conditions (or `all`, if true) according to `data`. Returns the number of rows updated.
+  """
+  comment_updateMany(
+    """
+    Filter condition to specify which rows to update.
+    """
+    where: Comment_Filter
+
+    """
+    Set to true to update all rows.
+    """
+    all: Boolean = false
+
+    """
+    Data object containing fields to update.
+    """
+    data: Comment_Data!
+  ): Int! @fdc_generated(from: "Comment", purpose: UPDATE_MULTIPLE)
+  """
+  ✨ Update `User` objects matching `where` conditions (or `all`, if true) according to `data`. Returns the number of rows updated.
+  """
+  user_updateMany(
+    """
+    Filter condition to specify which rows to update.
+    """
+    where: User_Filter
+
+    """
+    Set to true to update all rows.
+    """
+    all: Boolean = false
+
+    """
+    Data object containing fields to update.
+    """
+    data: User_Data!
+  ): Int! @fdc_generated(from: "User", purpose: UPDATE_MULTIPLE)
+  """
+  ✨ Update `Vote` objects matching `where` conditions (or `all`, if true) according to `data`. Returns the number of rows updated.
+  """
+  vote_updateMany(
+    """
+    Filter condition to specify which rows to update.
+    """
+    where: Vote_Filter
+
+    """
+    Set to true to update all rows.
+    """
+    all: Boolean = false
+
+    """
+    Data object containing fields to update.
+    """
+    data: Vote_Data!
+  ): Int! @fdc_generated(from: "Vote", purpose: UPDATE_MULTIPLE)
+  """
+  ✨ Delete a single `AISuggestion` based on `id`, `key` or `first` and return its key (or `null` if not found).
+  """
+  aISuggestion_delete(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: AISuggestion_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: AISuggestion_FirstRow
+  ): AISuggestion_KeyOutput @fdc_generated(from: "AISuggestion", purpose: DELETE_SINGLE)
+  """
+  ✨ Delete a single `ApiSubmission` based on `id`, `key` or `first` and return its key (or `null` if not found).
+  """
+  apiSubmission_delete(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: ApiSubmission_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: ApiSubmission_FirstRow
+  ): ApiSubmission_KeyOutput @fdc_generated(from: "ApiSubmission", purpose: DELETE_SINGLE)
+  """
+  ✨ Delete a single `ChatMessage` based on `id`, `key` or `first` and return its key (or `null` if not found).
+  """
+  chatMessage_delete(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: ChatMessage_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: ChatMessage_FirstRow
+  ): ChatMessage_KeyOutput @fdc_generated(from: "ChatMessage", purpose: DELETE_SINGLE)
+  """
+  ✨ Delete a single `ChatRoom` based on `id`, `key` or `first` and return its key (or `null` if not found).
+  """
+  chatRoom_delete(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: ChatRoom_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: ChatRoom_FirstRow
+  ): ChatRoom_KeyOutput @fdc_generated(from: "ChatRoom", purpose: DELETE_SINGLE)
+  """
+  ✨ Delete a single `Comment` based on `id`, `key` or `first` and return its key (or `null` if not found).
+  """
+  comment_delete(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: Comment_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: Comment_FirstRow
+  ): Comment_KeyOutput @fdc_generated(from: "Comment", purpose: DELETE_SINGLE)
+  """
+  ✨ Delete a single `User` based on `id`, `key` or `first` and return its key (or `null` if not found).
+  """
+  user_delete(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: User_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: User_FirstRow
+  ): User_KeyOutput @fdc_generated(from: "User", purpose: DELETE_SINGLE)
+  """
+  ✨ Delete a single `Vote` based on `id`, `key` or `first` and return its key (or `null` if not found).
+  """
+  vote_delete(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: Vote_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: Vote_FirstRow
+  ): Vote_KeyOutput @fdc_generated(from: "Vote", purpose: DELETE_SINGLE)
+  """
+  ✨ Delete `AISuggestion` objects matching `where` conditions (or `all`, if true). Returns the number of rows deleted.
+  """
+  aISuggestion_deleteMany(
+    """
+    Filter condition to specify which rows to delete.
+    """
+    where: AISuggestion_Filter
+
+    """
+    Set to true to delete all rows.
+    """
+    all: Boolean = false
+  ): Int! @fdc_generated(from: "AISuggestion", purpose: DELETE_MULTIPLE)
+  """
+  ✨ Delete `ApiSubmission` objects matching `where` conditions (or `all`, if true). Returns the number of rows deleted.
+  """
+  apiSubmission_deleteMany(
+    """
+    Filter condition to specify which rows to delete.
+    """
+    where: ApiSubmission_Filter
+
+    """
+    Set to true to delete all rows.
+    """
+    all: Boolean = false
+  ): Int! @fdc_generated(from: "ApiSubmission", purpose: DELETE_MULTIPLE)
+  """
+  ✨ Delete `ChatMessage` objects matching `where` conditions (or `all`, if true). Returns the number of rows deleted.
+  """
+  chatMessage_deleteMany(
+    """
+    Filter condition to specify which rows to delete.
+    """
+    where: ChatMessage_Filter
+
+    """
+    Set to true to delete all rows.
+    """
+    all: Boolean = false
+  ): Int! @fdc_generated(from: "ChatMessage", purpose: DELETE_MULTIPLE)
+  """
+  ✨ Delete `ChatRoom` objects matching `where` conditions (or `all`, if true). Returns the number of rows deleted.
+  """
+  chatRoom_deleteMany(
+    """
+    Filter condition to specify which rows to delete.
+    """
+    where: ChatRoom_Filter
+
+    """
+    Set to true to delete all rows.
+    """
+    all: Boolean = false
+  ): Int! @fdc_generated(from: "ChatRoom", purpose: DELETE_MULTIPLE)
+  """
+  ✨ Delete `Comment` objects matching `where` conditions (or `all`, if true). Returns the number of rows deleted.
+  """
+  comment_deleteMany(
+    """
+    Filter condition to specify which rows to delete.
+    """
+    where: Comment_Filter
+
+    """
+    Set to true to delete all rows.
+    """
+    all: Boolean = false
+  ): Int! @fdc_generated(from: "Comment", purpose: DELETE_MULTIPLE)
+  """
+  ✨ Delete `User` objects matching `where` conditions (or `all`, if true). Returns the number of rows deleted.
+  """
+  user_deleteMany(
+    """
+    Filter condition to specify which rows to delete.
+    """
+    where: User_Filter
+
+    """
+    Set to true to delete all rows.
+    """
+    all: Boolean = false
+  ): Int! @fdc_generated(from: "User", purpose: DELETE_MULTIPLE)
+  """
+  ✨ Delete `Vote` objects matching `where` conditions (or `all`, if true). Returns the number of rows deleted.
+  """
+  vote_deleteMany(
+    """
+    Filter condition to specify which rows to delete.
+    """
+    where: Vote_Filter
+
+    """
+    Set to true to delete all rows.
+    """
+    all: Boolean = false
+  ): Int! @fdc_generated(from: "Vote", purpose: DELETE_MULTIPLE)
+}

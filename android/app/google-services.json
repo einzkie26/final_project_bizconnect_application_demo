@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "685913601220",
+    "project_id": "finalprojectbizconnect",
+    "storage_bucket": "finalprojectbizconnect.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:685913601220:android:e9ed179c34b4196b6f0591",
+        "android_client_info": {
+          "package_name": "com.example.final_project_bizconnect_application_demo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBm9M0S-TD_YBMz14ltYtQbgHTNX_Ze5Zw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

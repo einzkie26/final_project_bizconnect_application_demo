@@ -1,0 +1,59 @@
+type User @table {
+  username: String!
+  email: String!
+  createdAt: Timestamp!
+  displayName: String
+  bio: String
+  profilePictureUrl: String
+}
+
+type ApiSubmission @table {
+  title: String!
+  description: String!
+  apiDefinition: String!
+  createdAt: Timestamp!
+  user: User
+  tags: [String]
+  status: String
+}
+
+type AISuggestion @table {
+  suggestionText: String!
+  suggestionType: String!
+  confidenceScore: Float!
+  createdAt: Timestamp!
+  apiSubmission: ApiSubmission
+  relatedCodeSnippet: String
+  status: String
+}
+
+type Comment @table {
+  commentText: String!
+  createdAt: Timestamp!
+  user: User
+  aiSuggestion: AISuggestion
+  parentComment: Comment
+}
+
+type Vote @table {
+  targetId: UUID!
+  targetType: String!
+  voteType: String!
+  createdAt: Timestamp!
+  user: User
+}
+
+type ChatRoom @table {
+  name: String!
+  createdAt: Timestamp!
+  description: String
+  isPublic: Boolean
+  apiSubmission: ApiSubmission
+}
+
+type ChatMessage @table {
+  messageText: String!
+  createdAt: Timestamp!
+  chatRoom: ChatRoom
+  user: User
+}

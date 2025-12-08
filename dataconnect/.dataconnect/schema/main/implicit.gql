@@ -1,0 +1,78 @@
+extend type AISuggestion {
+  """
+  ✨ Implicit primary key field. It's a UUID column default to a generated new value. See `@table` for how to customize it.
+  """
+  id: UUID! @default(expr: "uuidV4()") @fdc_generated(from: "AISuggestion", purpose: IMPLICIT_KEY_FIELD)
+  """
+  ✨ Implicit foreign key field based on `AISuggestion`.`apiSubmission`. It must match the value of `ApiSubmission`.`id`. See `@ref` for how to customize it.
+  """
+  apiSubmissionId: UUID @fdc_generated(from: "AISuggestion.apiSubmission", purpose: IMPLICIT_REF_FIELD)
+}
+extend type ApiSubmission {
+  """
+  ✨ Implicit primary key field. It's a UUID column default to a generated new value. See `@table` for how to customize it.
+  """
+  id: UUID! @default(expr: "uuidV4()") @fdc_generated(from: "ApiSubmission", purpose: IMPLICIT_KEY_FIELD)
+  """
+  ✨ Implicit foreign key field based on `ApiSubmission`.`user`. It must match the value of `User`.`id`. See `@ref` for how to customize it.
+  """
+  userId: UUID @fdc_generated(from: "ApiSubmission.user", purpose: IMPLICIT_REF_FIELD)
+}
+extend type ChatMessage {
+  """
+  ✨ Implicit primary key field. It's a UUID column default to a generated new value. See `@table` for how to customize it.
+  """
+  id: UUID! @default(expr: "uuidV4()") @fdc_generated(from: "ChatMessage", purpose: IMPLICIT_KEY_FIELD)
+  """
+  ✨ Implicit foreign key field based on `ChatMessage`.`chatRoom`. It must match the value of `ChatRoom`.`id`. See `@ref` for how to customize it.
+  """
+  chatRoomId: UUID @fdc_generated(from: "ChatMessage.chatRoom", purpose: IMPLICIT_REF_FIELD)
+  """
+  ✨ Implicit foreign key field based on `ChatMessage`.`user`. It must match the value of `User`.`id`. See `@ref` for how to customize it.
+  """
+  userId: UUID @fdc_generated(from: "ChatMessage.user", purpose: IMPLICIT_REF_FIELD)
+}
+extend type ChatRoom {
+  """
+  ✨ Implicit primary key field. It's a UUID column default to a generated new value. See `@table` for how to customize it.
+  """
+  id: UUID! @default(expr: "uuidV4()") @fdc_generated(from: "ChatRoom", purpose: IMPLICIT_KEY_FIELD)
+  """
+  ✨ Implicit foreign key field based on `ChatRoom`.`apiSubmission`. It must match the value of `ApiSubmission`.`id`. See `@ref` for how to customize it.
+  """
+  apiSubmissionId: UUID @fdc_generated(from: "ChatRoom.apiSubmission", purpose: IMPLICIT_REF_FIELD)
+}
+extend type Comment {
+  """
+  ✨ Implicit primary key field. It's a UUID column default to a generated new value. See `@table` for how to customize it.
+  """
+  id: UUID! @default(expr: "uuidV4()") @fdc_generated(from: "Comment", purpose: IMPLICIT_KEY_FIELD)
+  """
+  ✨ Implicit foreign key field based on `Comment`.`aiSuggestion`. It must match the value of `AISuggestion`.`id`. See `@ref` for how to customize it.
+  """
+  aiSuggestionId: UUID @fdc_generated(from: "Comment.aiSuggestion", purpose: IMPLICIT_REF_FIELD)
+  """
+  ✨ Implicit foreign key field based on `Comment`.`parentComment`. It must match the value of `Comment`.`id`. See `@ref` for how to customize it.
+  """
+  parentCommentId: UUID @fdc_generated(from: "Comment.parentComment", purpose: IMPLICIT_REF_FIELD)
+  """
+  ✨ Implicit foreign key field based on `Comment`.`user`. It must match the value of `User`.`id`. See `@ref` for how to customize it.
+  """
+  userId: UUID @fdc_generated(from: "Comment.user", purpose: IMPLICIT_REF_FIELD)
+}
+extend type User {
+  """
+  ✨ Implicit primary key field. It's a UUID column default to a generated new value. See `@table` for how to customize it.
+  """
+  id: UUID! @default(expr: "uuidV4()") @fdc_generated(from: "User", purpose: IMPLICIT_KEY_FIELD)
+}
+extend type Vote {
+  """
+  ✨ Implicit primary key field. It's a UUID column default to a generated new value. See `@table` for how to customize it.
+  """
+  id: UUID! @default(expr: "uuidV4()") @fdc_generated(from: "Vote", purpose: IMPLICIT_KEY_FIELD)
+  """
+  ✨ Implicit foreign key field based on `Vote`.`user`. It must match the value of `User`.`id`. See `@ref` for how to customize it.
+  """
+  userId: UUID @fdc_generated(from: "Vote.user", purpose: IMPLICIT_REF_FIELD)
+}

@@ -1,0 +1,373 @@
+extend type Query {
+  """
+  ✨ Look up a single `AISuggestion` based on `id`, `key` or `first` and return selected fields (or `null` if not found).
+  """
+  aISuggestion(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: AISuggestion_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: AISuggestion_FirstRow
+  ): AISuggestion @fdc_generated(from: "AISuggestion", purpose: QUERY_SINGLE)
+  """
+  ✨ Look up a single `ApiSubmission` based on `id`, `key` or `first` and return selected fields (or `null` if not found).
+  """
+  apiSubmission(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: ApiSubmission_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: ApiSubmission_FirstRow
+  ): ApiSubmission @fdc_generated(from: "ApiSubmission", purpose: QUERY_SINGLE)
+  """
+  ✨ Look up a single `ChatMessage` based on `id`, `key` or `first` and return selected fields (or `null` if not found).
+  """
+  chatMessage(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: ChatMessage_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: ChatMessage_FirstRow
+  ): ChatMessage @fdc_generated(from: "ChatMessage", purpose: QUERY_SINGLE)
+  """
+  ✨ Look up a single `ChatRoom` based on `id`, `key` or `first` and return selected fields (or `null` if not found).
+  """
+  chatRoom(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: ChatRoom_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: ChatRoom_FirstRow
+  ): ChatRoom @fdc_generated(from: "ChatRoom", purpose: QUERY_SINGLE)
+  """
+  ✨ Look up a single `Comment` based on `id`, `key` or `first` and return selected fields (or `null` if not found).
+  """
+  comment(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: Comment_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: Comment_FirstRow
+  ): Comment @fdc_generated(from: "Comment", purpose: QUERY_SINGLE)
+  """
+  ✨ Look up a single `User` based on `id`, `key` or `first` and return selected fields (or `null` if not found).
+  """
+  user(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: User_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: User_FirstRow
+  ): User @fdc_generated(from: "User", purpose: QUERY_SINGLE)
+  """
+  ✨ Look up a single `Vote` based on `id`, `key` or `first` and return selected fields (or `null` if not found).
+  """
+  vote(
+    """
+    The unique ID of the object.
+    """
+    id: UUID
+
+    """
+    The key used to identify the object.
+    """
+    key: Vote_Key
+
+    """
+    Fetch the first row based on the filters and ordering.
+    """
+    first: Vote_FirstRow
+  ): Vote @fdc_generated(from: "Vote", purpose: QUERY_SINGLE)
+  """
+  ✨ List `AISuggestion` objects in the table and return selected fields, optionally filtered by `where` conditions
+  """
+  aISuggestions(
+    """
+    Filter condition to narrow down the query results.
+    """
+    where: AISuggestion_Filter
+
+    """
+    Order the query results by specific fields.
+    """
+    orderBy: [AISuggestion_Order!]
+
+    """
+    Number of rows to skip before starting to return the results.
+    """
+    offset: Int
+
+    """
+    Maximum number of rows to return (defaults to 100 rows).
+    """
+    limit: Int = 100
+
+    """
+    Set to true to return distinct results.
+    """
+    distinct: Boolean = false
+
+    """
+    Filter condition to apply to the groups of aggregate queries.
+    """
+    having: AISuggestion_Having
+  ): [AISuggestion!]! @fdc_generated(from: "AISuggestion", purpose: QUERY_MULTIPLE)
+  """
+  ✨ List `ApiSubmission` objects in the table and return selected fields, optionally filtered by `where` conditions
+  """
+  apiSubmissions(
+    """
+    Filter condition to narrow down the query results.
+    """
+    where: ApiSubmission_Filter
+
+    """
+    Order the query results by specific fields.
+    """
+    orderBy: [ApiSubmission_Order!]
+
+    """
+    Number of rows to skip before starting to return the results.
+    """
+    offset: Int
+
+    """
+    Maximum number of rows to return (defaults to 100 rows).
+    """
+    limit: Int = 100
+
+    """
+    Set to true to return distinct results.
+    """
+    distinct: Boolean = false
+
+    """
+    Filter condition to apply to the groups of aggregate queries.
+    """
+    having: ApiSubmission_Having
+  ): [ApiSubmission!]! @fdc_generated(from: "ApiSubmission", purpose: QUERY_MULTIPLE)
+  """
+  ✨ List `ChatMessage` objects in the table and return selected fields, optionally filtered by `where` conditions
+  """
+  chatMessages(
+    """
+    Filter condition to narrow down the query results.
+    """
+    where: ChatMessage_Filter
+
+    """
+    Order the query results by specific fields.
+    """
+    orderBy: [ChatMessage_Order!]
+
+    """
+    Number of rows to skip before starting to return the results.
+    """
+    offset: Int
+
+    """
+    Maximum number of rows to return (defaults to 100 rows).
+    """
+    limit: Int = 100
+
+    """
+    Set to true to return distinct results.
+    """
+    distinct: Boolean = false
+
+    """
+    Filter condition to apply to the groups of aggregate queries.
+    """
+    having: ChatMessage_Having
+  ): [ChatMessage!]! @fdc_generated(from: "ChatMessage", purpose: QUERY_MULTIPLE)
+  """
+  ✨ List `ChatRoom` objects in the table and return selected fields, optionally filtered by `where` conditions
+  """
+  chatRooms(
+    """
+    Filter condition to narrow down the query results.
+    """
+    where: ChatRoom_Filter
+
+    """
+    Order the query results by specific fields.
+    """
+    orderBy: [ChatRoom_Order!]
+
+    """
+    Number of rows to skip before starting to return the results.
+    """
+    offset: Int
+
+    """
+    Maximum number of rows to return (defaults to 100 rows).
+    """
+    limit: Int = 100
+
+    """
+    Set to true to return distinct results.
+    """
+    distinct: Boolean = false
+
+    """
+    Filter condition to apply to the groups of aggregate queries.
+    """
+    having: ChatRoom_Having
+  ): [ChatRoom!]! @fdc_generated(from: "ChatRoom", purpose: QUERY_MULTIPLE)
+  """
+  ✨ List `Comment` objects in the table and return selected fields, optionally filtered by `where` conditions
+  """
+  comments(
+    """
+    Filter condition to narrow down the query results.
+    """
+    where: Comment_Filter
+
+    """
+    Order the query results by specific fields.
+    """
+    orderBy: [Comment_Order!]
+
+    """
+    Number of rows to skip before starting to return the results.
+    """
+    offset: Int
+
+    """
+    Maximum number of rows to return (defaults to 100 rows).
+    """
+    limit: Int = 100
+
+    """
+    Set to true to return distinct results.
+    """
+    distinct: Boolean = false
+
+    """
+    Filter condition to apply to the groups of aggregate queries.
+    """
+    having: Comment_Having
+  ): [Comment!]! @fdc_generated(from: "Comment", purpose: QUERY_MULTIPLE)
+  """
+  ✨ List `User` objects in the table and return selected fields, optionally filtered by `where` conditions
+  """
+  users(
+    """
+    Filter condition to narrow down the query results.
+    """
+    where: User_Filter
+
+    """
+    Order the query results by specific fields.
+    """
+    orderBy: [User_Order!]
+
+    """
+    Number of rows to skip before starting to return the results.
+    """
+    offset: Int
+
+    """
+    Maximum number of rows to return (defaults to 100 rows).
+    """
+    limit: Int = 100
+
+    """
+    Set to true to return distinct results.
+    """
+    distinct: Boolean = false
+
+    """
+    Filter condition to apply to the groups of aggregate queries.
+    """
+    having: User_Having
+  ): [User!]! @fdc_generated(from: "User", purpose: QUERY_MULTIPLE)
+  """
+  ✨ List `Vote` objects in the table and return selected fields, optionally filtered by `where` conditions
+  """
+  votes(
+    """
+    Filter condition to narrow down the query results.
+    """
+    where: Vote_Filter
+
+    """
+    Order the query results by specific fields.
+    """
+    orderBy: [Vote_Order!]
+
+    """
+    Number of rows to skip before starting to return the results.
+    """
+    offset: Int
+
+    """
+    Maximum number of rows to return (defaults to 100 rows).
+    """
+    limit: Int = 100
+
+    """
+    Set to true to return distinct results.
+    """
+    distinct: Boolean = false
+
+    """
+    Filter condition to apply to the groups of aggregate queries.
+    """
+    having: Vote_Having
+  ): [Vote!]! @fdc_generated(from: "Vote", purpose: QUERY_MULTIPLE)
+}
