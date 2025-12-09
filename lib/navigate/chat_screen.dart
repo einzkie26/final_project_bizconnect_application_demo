@@ -1595,7 +1595,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
       final timeStr = _formatTime(now);
       await ref.read(chatControllerProvider).sendMessage(
         _chatId!,
-        '📝 Note checklist updated on $timeStr',
+        'Note checklist updated on $timeStr',
       );
     } catch (e) {
       if (mounted) {
@@ -1725,7 +1725,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
     final timeStr = _formatTime(now);
     await ref.read(chatControllerProvider).sendMessage(
       _chatId!,
-      '📝 Note "$title" was edited on $timeStr',
+      'Note "$title" was edited on $timeStr',
     );
   }
   
