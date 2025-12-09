@@ -8,7 +8,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import '../controllers/chat_controller.dart';
 import '../models/message_model.dart';
 import '../widgets/loading_screen.dart';
@@ -29,6 +31,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
   final _messageController = TextEditingController();
   String? _chatId;
   final _currentUserId = FirebaseAuth.instance.currentUser?.uid;
+  final List<XFile> _selectedImages = [];
 
   @override
   void initState() {
@@ -529,90 +532,150 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
               },
             ),
           ),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  spreadRadius: 1,
-                  blurRadius: 3,
-                  offset: const Offset(0, -1),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                if (widget.chatType == 'company') ...[
-                  IconButton(
-                    icon: Icon(Icons.note_add, color: Colors.grey[600]),
-                    onPressed: _showCreateNoteDialog,
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.camera_alt, color: Colors.grey[600]),
-                    onPressed: _showImagePicker,
-                  ),
-                ] else
-                  IconButton(
-                    icon: Icon(Icons.attach_file, color: Colors.grey[600]),
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('File attachment coming soon!'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                    },
-                  ),
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(25),
-                    ),
-                    child: TextField(
-                      controller: _messageController,
-                      decoration: const InputDecoration(
-                        hintText: 'Type a message...',
-                        border: InputBorder.none,
-                        hintStyle: TextStyle(color: Colors.grey),
-                      ),
-                      onSubmitted: (_) => _sendMessage(),
-                      maxLines: null,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: Icon(
-                    Icons.emoji_emotions_outlined,
-                    color: Colors.grey[600],
-                  ),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Emoji picker coming soon!'),
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
-                  },
-                ),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_selectedImages.isNotEmpty)
                 Container(
-                  width: 48,
-                  height: 48,
-                  decoration: const BoxDecoration(
-                    color: Colors.deepPurple,
-                    shape: BoxShape.circle,
+                  height: 100,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    border: Border(top: BorderSide(color: Colors.grey[300]!)),
                   ),
-                  child: IconButton(
-                    icon: const Icon(Icons.send, color: Colors.white),
-                    onPressed: _sendMessage,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: _selectedImages.length,
+                          itemBuilder: (context, index) {
+                            return Stack(
+                              children: [
+                                Container(
+                                  width: 80,
+                                  height: 80,
+                                  margin: const EdgeInsets.only(right: 8),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.deepPurple, width: 2),
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: FutureBuilder<Uint8List>(
+                                      future: _selectedImages[index].readAsBytes(),
+                                      builder: (context, snapshot) {
+                                        if (snapshot.hasData) {
+                                          return Image.memory(snapshot.data!, fit: BoxFit.cover);
+                                        }
+                                        return const Center(child: CircularProgressIndicator());
+                                      },
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  top: -4,
+                                  right: 4,
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        _selectedImages.removeAt(index);
+                                      });
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.red,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(Icons.close, color: Colors.white, size: 16),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.deepPurple,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${_selectedImages.length}',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.1),
+                      spreadRadius: 1,
+                      blurRadius: 3,
+                      offset: const Offset(0, -1),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    if (widget.chatType == 'company') ...[
+                      IconButton(
+                        icon: Icon(Icons.note_add, color: Colors.grey[600]),
+                        onPressed: _showCreateNoteDialog,
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.camera_alt, color: Colors.grey[600]),
+                        onPressed: _showImagePicker,
+                      ),
+                    ] else
+                      IconButton(
+                        icon: Icon(Icons.attach_file, color: Colors.grey[600]),
+                        onPressed: _showImagePicker,
+                      ),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(25),
+                        ),
+                        child: TextField(
+                          controller: _messageController,
+                          decoration: const InputDecoration(
+                            hintText: 'Type a message...',
+                            border: InputBorder.none,
+                            hintStyle: TextStyle(color: Colors.grey),
+                          ),
+                          onSubmitted: (_) => _sendMessage(),
+                          maxLines: null,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: const BoxDecoration(
+                        color: Colors.deepPurple,
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        icon: Icon(_selectedImages.isNotEmpty ? Icons.send : Icons.send, color: Colors.white),
+                        onPressed: _selectedImages.isNotEmpty ? _sendSelectedImages : _sendMessage,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1833,7 +1896,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
               title: const Text('Take Photo'),
               onTap: () {
                 Navigator.pop(context);
-                _pickImage(ImageSource.camera);
+                _pickImage(ImageSource.camera, false);
               },
             ),
             ListTile(
@@ -1841,7 +1904,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
               title: const Text('Choose from Gallery'),
               onTap: () {
                 Navigator.pop(context);
-                _pickImage(ImageSource.gallery);
+                _pickImage(ImageSource.gallery, true);
               },
             ),
           ],
@@ -1850,47 +1913,91 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
     );
   }
   
-  Future<void> _pickImage(ImageSource source) async {
+  Future<void> _pickImage(ImageSource source, bool multiple) async {
     try {
       final picker = ImagePicker();
-      final pickedFile = await picker.pickImage(
-        source: source,
-        maxWidth: 1920,
-        maxHeight: 1080,
-        imageQuality: 85,
-      );
       
-      if (pickedFile != null) {
-        final bytes = await pickedFile.readAsBytes();
-        _uploadAndSendImageWeb(bytes, pickedFile.name);
+      if (multiple && source == ImageSource.gallery) {
+        final pickedFiles = await picker.pickMultiImage(
+          maxWidth: 1920,
+          maxHeight: 1080,
+          imageQuality: 85,
+        );
+        
+        if (pickedFiles.isNotEmpty) {
+          setState(() {
+            _selectedImages.addAll(pickedFiles);
+          });
+        }
+      } else {
+        final pickedFile = await picker.pickImage(
+          source: source,
+          maxWidth: 1920,
+          maxHeight: 1080,
+          imageQuality: 85,
+        );
+        
+        if (pickedFile != null) {
+          setState(() {
+            _selectedImages.add(pickedFile);
+          });
+        }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to pick image'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to pick image'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+  
+  Future<void> _sendSelectedImages() async {
+    if (_selectedImages.isEmpty) return;
+    
+    final imagesToSend = List<XFile>.from(_selectedImages);
+    setState(() {
+      _selectedImages.clear();
+    });
+    
+    for (var image in imagesToSend) {
+      final bytes = await image.readAsBytes();
+      await _uploadAndSendImageWeb(bytes, image.name);
     }
   }
   
   Future<void> _uploadAndSendImageWeb(Uint8List imageBytes, String fileName) async {
+    if (!mounted) return;
     try {
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('chat_images')
-          .child('${DateTime.now().millisecondsSinceEpoch}.jpg');
+      final base64Image = base64.encode(imageBytes);
       
-      await storageRef.putData(imageBytes);
-      final downloadUrl = await storageRef.getDownloadURL();
-      await _sendImageMessage(downloadUrl);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Upload failed'),
-          backgroundColor: Colors.red,
-        ),
+      final response = await http.post(
+        Uri.parse('https://api.imgbb.com/1/upload'),
+        body: {
+          'key': '493f13fa424a0c9fca4c01f64cdb0b0f',
+          'image': base64Image,
+        },
       );
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final imageUrl = data['data']['url'];
+        await _sendImageMessage(imageUrl);
+      } else {
+        throw Exception('Upload failed');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Upload failed'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
   
