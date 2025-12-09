@@ -1539,7 +1539,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
         // Send call notification message
         await ref.read(chatControllerProvider).sendMessage(
           _chatId!,
-          '📞 Voice call initiated',
+          'Voice call initiated',
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1589,6 +1589,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
           .update({
         'noteData.items': items,
       });
+      
+      // Send update notification message
+      final now = DateTime.now();
+      final timeStr = _formatTime(now);
+      await ref.read(chatControllerProvider).sendMessage(
+        _chatId!,
+        '📝 Note checklist updated on $timeStr',
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1708,9 +1716,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
         .collection('messages')
         .doc(messageId)
         .update({
-      'text': '📝 Note: $title',
+      'text': 'Note: $title',
       'noteData': noteData,
     });
+    
+    // Send update notification message
+    final now = DateTime.now();
+    final timeStr = _formatTime(now);
+    await ref.read(chatControllerProvider).sendMessage(
+      _chatId!,
+      '📝 Note "$title" was edited on $timeStr',
+    );
   }
   
   void _showCreateNoteDialog() {
@@ -1977,7 +1993,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
     await messageRef.set({
       'chatId': _chatId!,
       'senderId': _currentUserId,
-      'text': '📝 Note: $title',
+      'text': 'Note: $title',
       'timestamp': DateTime.now(),
       'isRead': false,
       'isDelivered': true,
@@ -1989,7 +2005,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
         .collection('chats')
         .doc(_chatId!)
         .update({
-      'lastMessage': '📝 Note: $title',
+      'lastMessage': 'Note: $title',
       'lastMessageTime': DateTime.now(),
       'lastSenderId': _currentUserId,
     });
@@ -2005,7 +2021,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
     await messageRef.set({
       'chatId': _chatId!,
       'senderId': _currentUserId,
-      'text': '📷 Photo',
+      'text': 'Photo',
       'timestamp': DateTime.now(),
       'isRead': false,
       'isDelivered': true,
@@ -2017,7 +2033,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
         .collection('chats')
         .doc(_chatId!)
         .update({
-      'lastMessage': '📷 Photo',
+      'lastMessage': 'Photo',
       'lastMessageTime': DateTime.now(),
       'lastSenderId': _currentUserId,
     });
@@ -2078,7 +2094,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 2),
             child: GestureDetector(
-              onTap: () => _toggleNoteItem(message.id, noteData, index),
+              onTap: isMe ? () => _toggleNoteItem(message.id, noteData, index) : null,
               child: Row(
                 children: [
                   Icon(
