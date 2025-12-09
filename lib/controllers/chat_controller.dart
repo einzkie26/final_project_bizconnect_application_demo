@@ -61,24 +61,71 @@ class ChatController {
     }
   }
 
-  Future<String> createOrGetChatId(String otherUserId, {String? chatType}) async {
+  Future<String> createOrGetChatId(String otherUserId, {String? chatType, String? companyId}) async {
     try {
       final user = _auth.currentUser;
       if (user == null || otherUserId.isEmpty) return '';
 
       // Determine chat type
       String finalChatType;
+      String? activeCompanyId;
+      
       if (chatType != null) {
         finalChatType = chatType;
       } else {
         // Get current user's mode to determine chat type
         final userDoc = await _firestore.collection('users').doc(user.uid).get();
         final isCompanyMode = userDoc.data()?['isCompanyMode'] ?? false;
+        activeCompanyId = userDoc.data()?['activeCompanyId'];
         finalChatType = isCompanyMode ? 'company' : 'personal';
       }
 
       final participants = [user.uid, otherUserId]..sort();
-      final chatId = '${finalChatType}_${participants.join('_')}';
+      String chatId;
+      String? targetCompanyId;
+      
+      // For company chats, include company ID to make each company chat unique
+      if (finalChatType == 'company') {
+        // Use provided companyId first
+        targetCompanyId = companyId ?? activeCompanyId;
+        
+        // If no company ID provided, try to find existing chat first
+        if (targetCompanyId == null) {
+          // Search for existing company chats with these participants
+          final existingChats = await _firestore
+              .collection('chats')
+              .where('participants', arrayContains: user.uid)
+              .where('type', isEqualTo: 'company')
+              .get();
+          
+          for (var doc in existingChats.docs) {
+            final data = doc.data();
+            final chatParticipants = List<String>.from(data['participants'] ?? []);
+            if (chatParticipants.contains(otherUserId)) {
+              // Found existing chat, return it
+              return doc.id;
+            }
+          }
+          
+          // No existing chat, get company ID to create new one
+          final companyQuery = await _firestore
+              .collection('companies')
+              .where('ownerId', isEqualTo: otherUserId)
+              .limit(1)
+              .get();
+          
+          if (companyQuery.docs.isNotEmpty) {
+            targetCompanyId = companyQuery.docs.first.id;
+          } else {
+            // No company found - cannot create company chat
+            return '';
+          }
+        }
+        
+        chatId = 'company_${targetCompanyId}_${participants.join('_')}';
+      } else {
+        chatId = 'personal_${participants.join('_')}';
+      }
 
       final chatDoc = await _firestore.collection('chats').doc(chatId).get();
       
@@ -91,20 +138,16 @@ class ChatController {
           'lastMessageTime': DateTime.now(),
         };
         
-        // For company chats, store company name
-        if (finalChatType == 'company') {
+        // For company chats, store company info
+        if (finalChatType == 'company' && targetCompanyId != null) {
           try {
-            final companyQuery = await _firestore
-                .collection('companies')
-                .where('ownerId', isEqualTo: otherUserId)
-                .limit(1)
-                .get();
-            
-            if (companyQuery.docs.isNotEmpty) {
-              chatData['companyName'] = companyQuery.docs.first.data()['name'];
+            final companyDoc = await _firestore.collection('companies').doc(targetCompanyId).get();
+            if (companyDoc.exists) {
+              chatData['companyId'] = targetCompanyId;
+              chatData['companyName'] = companyDoc.data()?['name'];
             }
           } catch (e) {
-            // Continue without company name if lookup fails
+            // Continue without company info if lookup fails
           }
         }
         

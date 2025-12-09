@@ -20,6 +20,7 @@ class _SearchPageState extends State<SearchPage> {
   List<UserModel> _searchResults = [];
   List<Map<String, dynamic>>? _companyResults = [];
   Set<String> _followingUsers = {};
+  Set<String> _followingCompanies = {};
 
   final List<String> _filters = [
     'All',
@@ -45,11 +46,19 @@ class _SearchPageState extends State<SearchPage> {
     try {
       final currentUserId = _auth.currentUser?.uid;
       
-      // Search users
+      // Search users by name
       final userQuery = await _firestore
           .collection('users')
           .where('name', isGreaterThanOrEqualTo: query)
           .where('name', isLessThan: '${query}z')
+          .limit(10)
+          .get();
+
+      // Search users by location
+      final locationQuery = await _firestore
+          .collection('users')
+          .where('location', isGreaterThanOrEqualTo: query)
+          .where('location', isLessThan: '${query}z')
           .limit(10)
           .get();
 
@@ -61,9 +70,10 @@ class _SearchPageState extends State<SearchPage> {
           .limit(10)
           .get();
 
-      final userResults = userQuery.docs
+      final userResults = [...userQuery.docs, ...locationQuery.docs]
           .map((doc) => UserModel.fromMap(doc.data(), doc.id))
           .where((user) => user.id != currentUserId)
+          .toSet()
           .toList();
 
       final companyResults = companyQuery.docs
@@ -75,6 +85,7 @@ class _SearchPageState extends State<SearchPage> {
             'industry': doc.data()['industry'],
             'ownerId': doc.data()['ownerId'],
             'memberIds': doc.data()['memberIds'],
+            'photoUrl': doc.data()['photoUrl'],
           })
           .toList();
 
@@ -199,13 +210,131 @@ class _SearchPageState extends State<SearchPage> {
           .where('followerId', isEqualTo: currentUserId)
           .get();
       
+      final companyFollowQuery = await _firestore
+          .collection('company_follows')
+          .where('followerId', isEqualTo: currentUserId)
+          .get();
+      
       setState(() {
         _followingUsers = followQuery.docs
             .map((doc) => doc.data()['followingId'] as String)
             .toSet();
+        _followingCompanies = companyFollowQuery.docs
+            .map((doc) => doc.data()['companyId'] as String)
+            .toSet();
       });
     } catch (e) {
       // Handle silently
+    }
+  }
+  
+  Future<void> _unfollowUser(String userId) async {
+    final currentUserId = _auth.currentUser?.uid;
+    if (currentUserId == null) return;
+    
+    try {
+      final followQuery = await _firestore
+          .collection('follows')
+          .where('followerId', isEqualTo: currentUserId)
+          .where('followingId', isEqualTo: userId)
+          .get();
+      
+      for (var doc in followQuery.docs) {
+        await doc.reference.delete();
+      }
+      
+      setState(() {
+        _followingUsers.remove(userId);
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unfollowed'), backgroundColor: Colors.orange),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to unfollow: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+  
+  Future<void> _followCompany(String companyId) async {
+    final currentUserId = _auth.currentUser?.uid;
+    if (currentUserId == null) return;
+    
+    try {
+      final existingFollow = await _firestore
+          .collection('company_follows')
+          .where('followerId', isEqualTo: currentUserId)
+          .where('companyId', isEqualTo: companyId)
+          .get();
+      
+      if (existingFollow.docs.isNotEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Already following this company')),
+          );
+        }
+        return;
+      }
+      
+      await _firestore.collection('company_follows').add({
+        'followerId': currentUserId,
+        'companyId': companyId,
+        'createdAt': DateTime.now(),
+      });
+      
+      setState(() {
+        _followingCompanies.add(companyId);
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Following company!'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to follow: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+  
+  Future<void> _unfollowCompany(String companyId) async {
+    final currentUserId = _auth.currentUser?.uid;
+    if (currentUserId == null) return;
+    
+    try {
+      final followQuery = await _firestore
+          .collection('company_follows')
+          .where('followerId', isEqualTo: currentUserId)
+          .where('companyId', isEqualTo: companyId)
+          .get();
+      
+      for (var doc in followQuery.docs) {
+        await doc.reference.delete();
+      }
+      
+      setState(() {
+        _followingCompanies.remove(companyId);
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unfollowed company'), backgroundColor: Colors.orange),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to unfollow: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -282,7 +411,7 @@ class _SearchPageState extends State<SearchPage> {
                         _addToRecentSearches(value);
                       },
                       decoration: InputDecoration(
-                        hintText: 'Search companies, people, or startups...',
+                        hintText: 'Search by name or location...',
                         hintStyle: TextStyle(
                           color: Colors.grey[500],
                           fontSize: 14,
@@ -416,6 +545,7 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   void _showUserProfile(UserModel user) {
+    _addToRecentSearches(user.name);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -474,16 +604,42 @@ class _SearchPageState extends State<SearchPage> {
                               width: 80,
                               height: 80,
                               decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [Colors.deepPurple.withOpacity(0.8), Colors.purple.withOpacity(0.6)],
-                                ),
                                 borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Colors.deepPurple.withOpacity(0.3), width: 2),
                               ),
-                              child: Center(
-                                child: Text(
-                                  user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
-                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 32),
-                                ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(14),
+                                child: user.profilePicUrl != null
+                                    ? Image.network(
+                                        user.profilePicUrl!,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => Container(
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              colors: [Colors.deepPurple.withOpacity(0.8), Colors.purple.withOpacity(0.6)],
+                                            ),
+                                          ),
+                                          child: Center(
+                                            child: Text(
+                                              user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
+                                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 32),
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                    : Container(
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: [Colors.deepPurple.withOpacity(0.8), Colors.purple.withOpacity(0.6)],
+                                          ),
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
+                                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 32),
+                                          ),
+                                        ),
+                                      ),
                               ),
                             ),
                             const SizedBox(width: 16),
@@ -624,17 +780,27 @@ class _SearchPageState extends State<SearchPage> {
                         child: Row(
                           children: [
                             Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: () => _followUser(user.id),
-                                icon: Icon(
-                                  _followingUsers.contains(user.id) ? Icons.check : Icons.person_add,
-                                  size: 18,
-                                ),
-                                label: Text(_followingUsers.contains(user.id) ? 'Following' : 'Follow'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: _followingUsers.contains(user.id) ? Colors.green : Colors.deepPurple,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                              child: StatefulBuilder(
+                                builder: (context, setModalState) => ElevatedButton.icon(
+                                  onPressed: () {
+                                    if (_followingUsers.contains(user.id)) {
+                                      _unfollowUser(user.id);
+                                    } else {
+                                      _followUser(user.id);
+                                    }
+                                    setModalState(() {});
+                                    setState(() {});
+                                  },
+                                  icon: Icon(
+                                    _followingUsers.contains(user.id) ? Icons.check : Icons.person_add,
+                                    size: 18,
+                                  ),
+                                  label: Text(_followingUsers.contains(user.id) ? 'Following' : 'Follow'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: _followingUsers.contains(user.id) ? Colors.green : Colors.deepPurple,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                  ),
                                 ),
                               ),
                             ),
@@ -719,6 +885,7 @@ class _SearchPageState extends State<SearchPage> {
   }
   
   void _showCompanyProfile(Map<String, dynamic> company) {
+    _addToRecentSearches(company['name']);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -760,21 +927,175 @@ class _SearchPageState extends State<SearchPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
-                        width: 80,
-                        height: 80,
+                        padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: Colors.deepPurple.withOpacity(0.1),
+                          gradient: LinearGradient(
+                            colors: [Colors.blue.withOpacity(0.1), Colors.blue.withOpacity(0.05)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
                           borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.blue.withOpacity(0.2)),
                         ),
-                        child: const Icon(Icons.business, color: Colors.deepPurple, size: 40),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 80,
+                              height: 80,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Colors.blue.withOpacity(0.3), width: 2),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(14),
+                                child: company['photoUrl'] != null
+                                    ? Image.network(
+                                        company['photoUrl'],
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => Container(
+                                          color: Colors.blue.withOpacity(0.2),
+                                          child: const Icon(Icons.business, color: Colors.blue, size: 40),
+                                        ),
+                                      )
+                                    : Container(
+                                        color: Colors.blue.withOpacity(0.2),
+                                        child: const Icon(Icons.business, color: Colors.blue, size: 40),
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(company['name'], style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                                  Text(company['industry'], style: const TextStyle(fontSize: 14, color: Colors.blue)),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.group, size: 14, color: Colors.grey),
+                                      const SizedBox(width: 4),
+                                      Text('${(company['memberIds'] as List?)?.length ?? 0} members', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 16),
-                      Text(company['name'], style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                      Text(company['industry'], style: TextStyle(fontSize: 16, color: Colors.deepPurple)),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[50],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.withOpacity(0.2)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(Icons.info, color: Colors.white, size: 18),
+                                ),
+                                const SizedBox(width: 12),
+                                const Text('About', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue)),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Text(company['description'] ?? 'No description available', style: const TextStyle(fontSize: 14)),
+                          ],
+                        ),
+                      ),
                       const SizedBox(height: 16),
-                      Text('About', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
-                      Text(company['description'] ?? 'No description available'),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.green.withOpacity(0.2)),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: StatefulBuilder(
+                                builder: (context, setModalState) => ElevatedButton.icon(
+                                  onPressed: () {
+                                    if (_followingCompanies.contains(company['id'])) {
+                                      _unfollowCompany(company['id']);
+                                    } else {
+                                      _followCompany(company['id']);
+                                    }
+                                    setModalState(() {});
+                                    setState(() {});
+                                  },
+                                  icon: Icon(
+                                    _followingCompanies.contains(company['id']) ? Icons.check : Icons.favorite_border,
+                                    size: 18,
+                                  ),
+                                  label: Text(_followingCompanies.contains(company['id']) ? 'Following' : 'Follow'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: _followingCompanies.contains(company['id']) ? Colors.green : Colors.blue,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: FutureBuilder<DocumentSnapshot>(
+                                future: _firestore.collection('users').doc(company['ownerId']).get(),
+                                builder: (context, snapshot) {
+                                  if (!snapshot.hasData) {
+                                    return ElevatedButton.icon(
+                                      onPressed: null,
+                                      icon: const Icon(Icons.message, size: 18),
+                                      label: const Text('Message'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.deepPurple,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                      ),
+                                    );
+                                  }
+                                  final ownerData = snapshot.data!.data() as Map<String, dynamic>?;
+                                  return ElevatedButton.icon(
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => ChatScreen(
+                                            otherUserId: company['ownerId'],
+                                            otherUserName: company['name'],
+                                            chatType: 'company',
+                                            companyId: company['id'],
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    icon: const Icon(Icons.message, size: 18),
+                                    label: const Text('Message'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.deepPurple,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       const SizedBox(height: 16),
                       FutureBuilder<DocumentSnapshot>(
                         future: _firestore.collection('users').doc(company['ownerId']).get(),
@@ -902,23 +1223,56 @@ class _SearchPageState extends State<SearchPage> {
             width: 60,
             height: 60,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Colors.deepPurple.withOpacity(0.8),
-                  Colors.purple.withOpacity(0.6),
-                ],
-              ),
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.deepPurple.withOpacity(0.3), width: 2),
             ),
-            child: Center(
-              child: Text(
-                user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 24,
-                ),
-              ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: user.profilePicUrl != null
+                  ? Image.network(
+                      user.profilePicUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.deepPurple.withOpacity(0.8),
+                              Colors.purple.withOpacity(0.6),
+                            ],
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 24,
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  : Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.deepPurple.withOpacity(0.8),
+                            Colors.purple.withOpacity(0.6),
+                          ],
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 24,
+                          ),
+                        ),
+                      ),
+                    ),
             ),
           ),
           const SizedBox(width: 16),
@@ -1134,10 +1488,25 @@ class _SearchPageState extends State<SearchPage> {
             width: 60,
             height: 60,
             decoration: BoxDecoration(
-              color: Colors.deepPurple.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.blue.withOpacity(0.3), width: 2),
             ),
-            child: const Icon(Icons.business, color: Colors.deepPurple, size: 30),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: company['photoUrl'] != null
+                  ? Image.network(
+                      company['photoUrl'],
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: Colors.blue.withOpacity(0.1),
+                        child: const Icon(Icons.business, color: Colors.blue, size: 30),
+                      ),
+                    )
+                  : Container(
+                      color: Colors.blue.withOpacity(0.1),
+                      child: const Icon(Icons.business, color: Colors.blue, size: 30),
+                    ),
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(

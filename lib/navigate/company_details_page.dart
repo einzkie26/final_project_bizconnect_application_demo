@@ -101,9 +101,12 @@ class _CompanyDetailsPageState extends State<CompanyDetailsPage> {
         }
 
         if (mounted) {
-          Navigator.pop(context);
+          setState(() => _isFollowing = false);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Unfollowed company')),
+            const SnackBar(
+              content: Text('Unfollowed company'),
+              backgroundColor: Colors.orange,
+            ),
           );
         }
       } else {
@@ -113,15 +116,25 @@ class _CompanyDetailsPageState extends State<CompanyDetailsPage> {
           'createdAt': DateTime.now(),
         });
 
-        setState(() => _isFollowing = true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Following company!')),
-        );
+        if (mounted) {
+          setState(() => _isFollowing = true);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Following company!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to update follow status')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to update follow status'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -133,6 +146,7 @@ class _CompanyDetailsPageState extends State<CompanyDetailsPage> {
           otherUserId: widget.company.ownerId,
           otherUserName: widget.company.name,
           chatType: 'company',
+          companyId: widget.company.id,
         ),
       ),
     );

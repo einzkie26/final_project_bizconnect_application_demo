@@ -11,6 +11,7 @@ class ChatPreview {
   final DateTime lastMessageTime;
   final bool hasUnread;
   final int unreadCount;
+  final String? companyId;
 
   ChatPreview({
     required this.chatId,
@@ -21,6 +22,7 @@ class ChatPreview {
     required this.lastMessageTime,
     this.hasUnread = false,
     this.unreadCount = 0,
+    this.companyId,
   });
   
   @override
@@ -84,15 +86,12 @@ class MessagesController {
         
         if (otherUserId.isEmpty) continue;
         
-        // Skip if we already have a chat with this user (prevent duplicates)
-        if (uniqueChats.containsKey(otherUserId)) {
-          final existingChat = uniqueChats[otherUserId]!;
-          final currentMessageTime = data['lastMessageTime']?.toDate() ?? DateTime.now();
-          if (currentMessageTime.isAfter(existingChat.lastMessageTime)) {
-            // Update with more recent chat
-          } else {
-            continue; // Skip this older chat
-          }
+        // Use chatId as unique key for company chats to distinguish different companies
+        final uniqueKey = isCompanyMode ? doc.id : otherUserId;
+        
+        // Skip if we already have this exact chat
+        if (uniqueChats.containsKey(uniqueKey)) {
+          continue;
         }
         
         String otherUserName = 'User';
@@ -159,7 +158,7 @@ class MessagesController {
           unreadCount = 0;
         }
         
-        uniqueChats[otherUserId] = ChatPreview(
+        uniqueChats[uniqueKey] = ChatPreview(
           chatId: doc.id,
           otherUserId: otherUserId,
           otherUserName: otherUserName,
@@ -168,6 +167,7 @@ class MessagesController {
           lastMessageTime: data['lastMessageTime']?.toDate() ?? DateTime.now(),
           hasUnread: hasUnread,
           unreadCount: unreadCount,
+          companyId: data['companyId'],
         );
       } catch (e) {
         continue;

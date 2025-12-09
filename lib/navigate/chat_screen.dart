@@ -17,8 +17,9 @@ class ChatScreen extends ConsumerStatefulWidget {
   final String otherUserId;
   final String otherUserName;
   final String? chatType;
+  final String? companyId;
   
-  const ChatScreen({super.key, required this.otherUserId, required this.otherUserName, this.chatType});
+  const ChatScreen({super.key, required this.otherUserId, required this.otherUserName, this.chatType, this.companyId});
 
   @override
   ConsumerState<ChatScreen> createState() => _ChatScreenState();
@@ -57,22 +58,25 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
   }
 
   Future<void> _initializeChat() async {
+    if (!mounted) return;
     try {
       final chatController = ref.read(chatControllerProvider);
       final chatId = await chatController.createOrGetChatId(
         widget.otherUserId, 
         chatType: widget.chatType,
+        companyId: widget.companyId,
       );
-      if (mounted && chatId.isNotEmpty) {
+      if (!mounted) return;
+      if (chatId.isNotEmpty) {
         setState(() {
           _chatId = chatId;
         });
         
         // Mark messages as read when chat is opened
-        if (_currentUserId != null) {
+        if (_currentUserId != null && mounted) {
           await chatController.markMessagesAsRead(chatId, _currentUserId);
         }
-      } else if (mounted) {
+      } else {
         setState(() {
           _chatId = 'error';
         });
@@ -116,16 +120,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
         title: Row(
           children: [
             widget.chatType == 'company'
-                ? FutureBuilder<QuerySnapshot>(
-                    future: FirebaseFirestore.instance
-                        .collection('companies')
-                        .where('ownerId', isEqualTo: widget.otherUserId)
-                        .limit(1)
-                        .get(),
+                ? FutureBuilder<DocumentSnapshot>(
+                    future: widget.companyId != null
+                        ? FirebaseFirestore.instance.collection('companies').doc(widget.companyId).get()
+                        : FirebaseFirestore.instance
+                            .collection('companies')
+                            .where('ownerId', isEqualTo: widget.otherUserId)
+                            .limit(1)
+                            .get()
+                            .then((snapshot) => snapshot.docs.first),
                     builder: (context, snapshot) {
                       String? photoUrl;
-                      if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-                        final data = snapshot.data!.docs.first.data() as Map<String, dynamic>;
+                      if (snapshot.hasData && snapshot.data!.data() != null) {
+                        final data = snapshot.data!.data() as Map<String, dynamic>;
                         photoUrl = data['photoUrl'];
                       }
                       return Container(
@@ -208,44 +215,84 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
                   ),
             const SizedBox(width: 12),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.otherUserName,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  widget.chatType == 'company'
-                      ? FutureBuilder<DocumentSnapshot>(
-                          future: FirebaseFirestore.instance.collection('chats').doc(_chatId).get(),
-                          builder: (context, snapshot) {
-                            if (snapshot.hasData && snapshot.data!.exists) {
-                              final chatData = snapshot.data!.data() as Map<String, dynamic>;
-                              if (chatData['isArchived'] == true) {
-                                return const Text(
-                                  'Company deleted',
-                                  style: TextStyle(
-                                    color: Colors.red,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                );
-                              }
-                            }
-                            return const Text(
+              child: widget.chatType == 'company'
+                  ? FutureBuilder<List<DocumentSnapshot>>(
+                      future: Future.wait([
+                        widget.companyId != null
+                            ? FirebaseFirestore.instance.collection('companies').doc(widget.companyId).get()
+                            : FirebaseFirestore.instance.collection('chats').doc(_chatId).get().then((chat) async {
+                                final chatData = chat.data() as Map<String, dynamic>?;
+                                final companyId = chatData?['companyId'];
+                                if (companyId != null) {
+                                  return await FirebaseFirestore.instance.collection('companies').doc(companyId).get();
+                                }
+                                return chat;
+                              }),
+                        FirebaseFirestore.instance.collection('users').doc(widget.otherUserId).get(),
+                      ]),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasData) {
+                          final companyData = snapshot.data![0].data() as Map<String, dynamic>?;
+                          final userData = snapshot.data![1].data() as Map<String, dynamic>?;
+                          
+                          final companyName = companyData?['name'] ?? widget.otherUserName;
+                          final senderName = userData?['name'] ?? 'User';
+                          
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                companyName,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                'from $senderName',
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          );
+                        }
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.otherUserName,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const Text(
                               'Company Chat',
                               style: TextStyle(
                                 color: Colors.white70,
                                 fontSize: 12,
                               ),
-                            );
-                          },
-                        )
-                      : StreamBuilder<DocumentSnapshot>(
+                            ),
+                          ],
+                        );
+                      },
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.otherUserName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        StreamBuilder<DocumentSnapshot>(
                           stream: FirebaseFirestore.instance
                               .collection('users')
                               .doc(widget.otherUserId)
@@ -420,17 +467,38 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
                     return Column(
                       crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                       children: [
-                        Padding(
-                          padding: const EdgeInsets.only(left: 12, right: 12, bottom: 4),
-                          child: Text(
-                            isMe ? 'Sent by you' : 'Message from ${widget.otherUserName}',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey[600],
-                              fontWeight: FontWeight.w500,
+                        if (widget.chatType == 'company')
+                          FutureBuilder<DocumentSnapshot>(
+                            future: FirebaseFirestore.instance.collection('users').doc(message.senderId).get(),
+                            builder: (context, snapshot) {
+                              final userName = snapshot.hasData && snapshot.data!.data() != null
+                                  ? (snapshot.data!.data() as Map<String, dynamic>)['name'] ?? 'User'
+                                  : 'User';
+                              return Padding(
+                                padding: const EdgeInsets.only(left: 12, right: 12, bottom: 4),
+                                child: Text(
+                                  isMe ? 'Sent by you' : 'Message from $userName',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey[600],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              );
+                            },
+                          )
+                        else
+                          Padding(
+                            padding: const EdgeInsets.only(left: 12, right: 12, bottom: 4),
+                            child: Text(
+                              isMe ? 'Sent by you' : 'Message from ${widget.otherUserName}',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ),
-                        ),
                         Align(
                           alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
                           child: Container(
@@ -567,25 +635,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
   }
 
   void _sendMessage() async {
-    if (_messageController.text.trim().isEmpty) return;
+    if (!mounted || _messageController.text.trim().isEmpty) return;
     
     if (!await _checkInternetConnection()) {
-      _showConnectionError();
+      if (mounted) _showConnectionError();
       return;
     }
     
     // Check if chat is archived (company deleted)
     try {
       final chatDoc = await FirebaseFirestore.instance.collection('chats').doc(_chatId!).get();
+      if (!mounted) return;
       if (chatDoc.exists) {
         final chatData = chatDoc.data() as Map<String, dynamic>;
         if (chatData['isArchived'] == true) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Cannot send message. Company no longer exists.'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Cannot send message. Company no longer exists.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
           return;
         }
       }
@@ -593,9 +664,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
       // Continue with normal flow if check fails
     }
     
+    if (!mounted) return;
     final chatController = ref.read(chatControllerProvider);
     await chatController.sendMessage(_chatId!, _messageController.text);
-    _messageController.clear();
+    if (mounted) _messageController.clear();
   }
 
   String _formatTime(DateTime timestamp) {
@@ -1488,7 +1560,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
   }
 
   Future<void> _updateUserPresence(bool isOnline) async {
-    if (_currentUserId == null) return;
+    if (_currentUserId == null || !mounted) return;
     
     try {
       await FirebaseFirestore.instance
@@ -1503,6 +1575,144 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
     }
   }
 
+  void _toggleNoteItem(String messageId, Map<String, dynamic> noteData, int index) async {
+    if (!mounted) return;
+    try {
+      final items = List<Map<String, dynamic>>.from(noteData['items']);
+      items[index]['checked'] = !(items[index]['checked'] ?? false);
+      
+      await FirebaseFirestore.instance
+          .collection('chats')
+          .doc(_chatId!)
+          .collection('messages')
+          .doc(messageId)
+          .update({
+        'noteData.items': items,
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update note'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+  
+  void _editNote(String messageId, String currentTitle, List<Map<String, dynamic>> currentItems) {
+    final titleController = TextEditingController(text: currentTitle);
+    final List<Map<String, dynamic>> checkItems = currentItems.map((item) => {
+      'controller': TextEditingController(text: item['text']),
+      'checked': item['checked'] ?? false,
+    }).toList();
+    
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Edit Note'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: titleController,
+                  decoration: const InputDecoration(
+                    labelText: 'Note Title',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text('Checklist Items:', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                ...checkItems.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final item = entry.value;
+                  return Row(
+                    children: [
+                      Checkbox(
+                        value: item['checked'],
+                        onChanged: (value) {
+                          setState(() {
+                            checkItems[index]['checked'] = value ?? false;
+                          });
+                        },
+                      ),
+                      Expanded(
+                        child: TextField(
+                          controller: item['controller'],
+                          decoration: const InputDecoration(
+                            hintText: 'Task item',
+                            border: InputBorder.none,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () {
+                          setState(() {
+                            checkItems.removeAt(index);
+                          });
+                        },
+                      ),
+                    ],
+                  );
+                }),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      checkItems.add({
+                        'controller': TextEditingController(),
+                        'checked': false,
+                      });
+                    });
+                  },
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Item'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (titleController.text.isNotEmpty) {
+                  _updateNote(messageId, titleController.text, checkItems);
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text('Update'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Future<void> _updateNote(String messageId, String title, List<Map<String, dynamic>> items) async {
+    final noteData = {
+      'title': title,
+      'items': items.map((item) => {
+        'text': item['controller'].text,
+        'checked': item['checked'],
+      }).toList(),
+    };
+    
+    await FirebaseFirestore.instance
+        .collection('chats')
+        .doc(_chatId!)
+        .collection('messages')
+        .doc(messageId)
+        .update({
+      'text': '📝 Note: $title',
+      'noteData': noteData,
+    });
+  }
+  
   void _showCreateNoteDialog() {
     final titleController = TextEditingController();
     final List<Map<String, dynamic>> checkItems = [];
@@ -1839,6 +2049,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
                   fontSize: 12,
                 ),
               ),
+              const Spacer(),
+              if (isMe)
+                GestureDetector(
+                  onTap: () => _editNote(message.id, title, items),
+                  child: Icon(
+                    Icons.edit,
+                    color: isMe ? Colors.white70 : Colors.grey,
+                    size: 16,
+                  ),
+                ),
             ],
           ),
         ),
@@ -1852,29 +2072,36 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
           ),
         ),
         const SizedBox(height: 8),
-        ...items.map((item) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 2),
-          child: Row(
-            children: [
-              Icon(
-                item['checked'] ? Icons.check_box : Icons.check_box_outline_blank,
-                color: item['checked'] ? Colors.green : (isMe ? Colors.white70 : Colors.grey),
-                size: 16,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  item['text'],
-                  style: TextStyle(
-                    color: isMe ? Colors.white : Colors.black87,
-                    fontSize: 14,
-                    decoration: item['checked'] ? TextDecoration.lineThrough : null,
+        ...items.asMap().entries.map((entry) {
+          final index = entry.key;
+          final item = entry.value;
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: GestureDetector(
+              onTap: () => _toggleNoteItem(message.id, noteData, index),
+              child: Row(
+                children: [
+                  Icon(
+                    item['checked'] ? Icons.check_box : Icons.check_box_outline_blank,
+                    color: item['checked'] ? Colors.green : (isMe ? Colors.white70 : Colors.grey),
+                    size: 16,
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      item['text'],
+                      style: TextStyle(
+                        color: isMe ? Colors.white : Colors.black87,
+                        fontSize: 14,
+                        decoration: item['checked'] ? TextDecoration.lineThrough : null,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        )),
+            ),
+          );
+        }),
         const SizedBox(height: 4),
         Row(
           mainAxisSize: MainAxisSize.min,

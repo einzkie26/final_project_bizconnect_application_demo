@@ -151,7 +151,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
   
-  void _messageCompany(String ownerId, String companyName) {
+  void _messageCompany(String ownerId, String companyName, String companyId) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -159,6 +159,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           otherUserId: ownerId,
           otherUserName: companyName,
           chatType: 'company',
+          companyId: companyId,
         ),
       ),
     );

@@ -549,6 +549,7 @@ class _MessagesPageState extends ConsumerState<MessagesPage> with SingleTickerPr
                       otherUserId: chat.otherUserId,
                       otherUserName: chat.otherUserName,
                       chatType: 'company',
+                      companyId: chat.companyId,
                     ),
                   ),
                 );

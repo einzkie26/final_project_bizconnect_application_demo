@@ -2124,74 +2124,16 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () async {
-                                final user = FirebaseAuth.instance.currentUser;
-                                if (user == null) return;
-                                
-                                final followQuery = await FirebaseFirestore.instance
-                                    .collection('company_follows')
-                                    .where('followerId', isEqualTo: user.uid)
-                                    .where('companyId', isEqualTo: companyId)
-                                    .get();
-                                
-                                for (var doc in followQuery.docs) {
-                                  await doc.reference.delete();
-                                }
-                                
-                                Navigator.pop(context);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Unfollowed company')),
-                                );
-                              },
-                              icon: const Icon(Icons.favorite_border, color: Colors.white),
-                              label: const Text('Unfollow', style: TextStyle(color: Colors.white)),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                Navigator.pop(context);
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => ChatScreen(
-                                      otherUserId: ownerId,
-                                      otherUserName: companyData['name'],
-                                      chatType: 'company',
-                                    ),
-                                  ),
-                                );
-                              },
-                              icon: const Icon(Icons.message, color: Colors.white),
-                              label: const Text('Message', style: TextStyle(color: Colors.white)),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.deepPurple,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                              ),
-                            ),
-                          ),
-                        ],
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.deepPurple,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        width: double.infinity,
-                        child: TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('Close'),
-                        ),
-                      ),
-                    ],
+                      child: const Text('Close', style: TextStyle(color: Colors.white)),
+                    ),
                   ),
                 ),
               ],
@@ -2258,12 +2200,12 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     if (user == null) return 0;
     
     try {
-      final memberships = await FirebaseFirestore.instance
-          .collection('company_members')
-          .where('userId', isEqualTo: user.uid)
+      final chats = await FirebaseFirestore.instance
+          .collection('chats')
+          .where('participants', arrayContains: user.uid)
           .get();
       
-      return memberships.docs.length;
+      return chats.docs.length;
     } catch (e) {
       return 0;
     }
@@ -2274,12 +2216,17 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     if (user == null) return 0;
     
     try {
-      final following = await FirebaseFirestore.instance
+      final companyFollows = await FirebaseFirestore.instance
           .collection('company_follows')
           .where('followerId', isEqualTo: user.uid)
           .get();
       
-      return following.docs.length;
+      final userFollows = await FirebaseFirestore.instance
+          .collection('follows')
+          .where('followerId', isEqualTo: user.uid)
+          .get();
+      
+      return companyFollows.docs.length + userFollows.docs.length;
     } catch (e) {
       return 0;
     }
@@ -2359,102 +2306,174 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     if (type == 'connections') {
       return FutureBuilder<QuerySnapshot>(
         future: FirebaseFirestore.instance
-            .collection('company_members')
-            .where('userId', isEqualTo: user.uid)
+            .collection('chats')
+            .where('participants', arrayContains: user.uid)
             .get(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
           
-          final memberships = snapshot.data!.docs;
-          if (memberships.isEmpty) {
+          final chats = snapshot.data!.docs;
+          if (chats.isEmpty) {
             return const Center(child: Text('No connections yet'));
           }
           
           return ListView.builder(
             controller: scrollController,
-            itemCount: memberships.length,
+            itemCount: chats.length,
             itemBuilder: (context, index) {
-              final memberData = memberships[index].data() as Map<String, dynamic>;
-              return FutureBuilder<DocumentSnapshot>(
-                future: FirebaseFirestore.instance
-                    .collection('companies')
-                    .doc(memberData['companyId'])
-                    .get(),
-                builder: (context, companySnapshot) {
-                  if (!companySnapshot.hasData) return const SizedBox();
-                  
-                  final companyData = companySnapshot.data!.data() as Map<String, dynamic>?;
-                  if (companyData == null) return const SizedBox();
-                  
-                  return ListTile(
-                    leading: const CircleAvatar(
-                      backgroundColor: Colors.deepPurple,
-                      child: Icon(Icons.business, color: Colors.white),
-                    ),
-                    title: Text(companyData['name']),
-                    subtitle: Text('Position: ${memberData['position'] ?? 'Member'}'),
-                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                    onTap: () => _showCompanyProfile(memberData['companyId']),
-                  );
-                },
-              );
+              final chatData = chats[index].data() as Map<String, dynamic>;
+              final participants = List<String>.from(chatData['participants'] ?? []);
+              final otherUserId = participants.firstWhere((id) => id != user.uid, orElse: () => '');
+              final chatType = chatData['type'] ?? 'personal';
+              
+              if (chatType == 'company') {
+                final companyId = chatData['companyId'];
+                return FutureBuilder<DocumentSnapshot>(
+                  future: FirebaseFirestore.instance.collection('companies').doc(companyId).get(),
+                  builder: (context, companySnapshot) {
+                    if (!companySnapshot.hasData) return const SizedBox();
+                    final companyData = companySnapshot.data!.data() as Map<String, dynamic>?;
+                    if (companyData == null) return const SizedBox();
+                    
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: Colors.blue.withOpacity(0.1),
+                        child: const Icon(Icons.business, color: Colors.blue),
+                      ),
+                      title: Text(companyData['name']),
+                      subtitle: const Text('Company Chat'),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    );
+                  },
+                );
+              } else {
+                return FutureBuilder<DocumentSnapshot>(
+                  future: FirebaseFirestore.instance.collection('users').doc(otherUserId).get(),
+                  builder: (context, userSnapshot) {
+                    if (!userSnapshot.hasData) return const SizedBox();
+                    final userData = userSnapshot.data!.data() as Map<String, dynamic>?;
+                    if (userData == null) return const SizedBox();
+                    
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: Colors.deepPurple,
+                        child: Text(
+                          userData['name']?.substring(0, 1).toUpperCase() ?? 'U',
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                      title: Text(userData['name'] ?? 'User'),
+                      subtitle: const Text('Personal Chat'),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    );
+                  },
+                );
+              }
             },
           );
         },
       );
     } else if (type == 'following') {
-      return FutureBuilder<QuerySnapshot>(
-        future: FirebaseFirestore.instance
-            .collection('company_follows')
-            .where('followerId', isEqualTo: user.uid)
-            .get(),
+      return FutureBuilder<List<QuerySnapshot>>(
+        future: Future.wait([
+          FirebaseFirestore.instance
+              .collection('company_follows')
+              .where('followerId', isEqualTo: user.uid)
+              .get(),
+          FirebaseFirestore.instance
+              .collection('follows')
+              .where('followerId', isEqualTo: user.uid)
+              .get(),
+        ]),
         builder: (context, snapshot) {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
           
-          final following = snapshot.data!.docs;
-          if (following.isEmpty) {
-            return const Center(child: Text('Not following any companies'));
+          final companyFollows = snapshot.data![0].docs;
+          final userFollows = snapshot.data![1].docs;
+          
+          if (companyFollows.isEmpty && userFollows.isEmpty) {
+            return const Center(child: Text('Not following anyone'));
           }
           
-          return ListView.builder(
+          return ListView(
             controller: scrollController,
-            itemCount: following.length,
-            itemBuilder: (context, index) {
-              final followData = following[index].data() as Map<String, dynamic>;
-              return FutureBuilder<DocumentSnapshot>(
-                future: FirebaseFirestore.instance
-                    .collection('companies')
-                    .doc(followData['companyId'])
-                    .get(),
-                builder: (context, companySnapshot) {
-                  if (!companySnapshot.hasData) return const SizedBox();
-                  
-                  final companyData = companySnapshot.data!.data() as Map<String, dynamic>?;
-                  if (companyData == null) return const SizedBox();
-                  
+            children: [
+              if (companyFollows.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text('Companies (${companyFollows.length})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                ),
+                ...companyFollows.map((doc) {
+                  final followData = doc.data() as Map<String, dynamic>;
                   return FutureBuilder<DocumentSnapshot>(
                     future: FirebaseFirestore.instance
-                        .collection('users')
-                        .doc(companyData['ownerId'])
+                        .collection('companies')
+                        .doc(followData['companyId'])
                         .get(),
-                    builder: (context, ownerSnapshot) {
-                      final ownerData = ownerSnapshot.data?.data() as Map<String, dynamic>?;
+                    builder: (context, companySnapshot) {
+                      if (!companySnapshot.hasData) return const SizedBox();
+                      final companyData = companySnapshot.data!.data() as Map<String, dynamic>?;
+                      if (companyData == null) return const SizedBox();
                       
                       return ListTile(
-                        leading: const CircleAvatar(
-                          backgroundColor: Colors.deepPurple,
-                          child: Icon(Icons.business, color: Colors.white),
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.blue.withOpacity(0.1),
+                          child: const Icon(Icons.business, color: Colors.blue),
                         ),
                         title: Text(companyData['name']),
-                        subtitle: Text('Owner: ${ownerData?['name'] ?? 'Unknown'}'),
-                        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                        onTap: () => _showCompanyProfile(followData['companyId']),
+                        subtitle: Text(companyData['industry'] ?? 'Company'),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.close, size: 20),
+                          onPressed: () async {
+                            await doc.reference.delete();
+                            setState(() {});
+                          },
+                        ),
                       );
                     },
                   );
-                },
-              );
-            },
+                }),
+              ],
+              if (userFollows.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text('People (${userFollows.length})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                ),
+                ...userFollows.map((doc) {
+                  final followData = doc.data() as Map<String, dynamic>;
+                  return FutureBuilder<DocumentSnapshot>(
+                    future: FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(followData['followingId'])
+                        .get(),
+                    builder: (context, userSnapshot) {
+                      if (!userSnapshot.hasData) return const SizedBox();
+                      final userData = userSnapshot.data!.data() as Map<String, dynamic>?;
+                      if (userData == null) return const SizedBox();
+                      
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.deepPurple,
+                          child: Text(
+                            userData['name']?.substring(0, 1).toUpperCase() ?? 'U',
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                        ),
+                        title: Text(userData['name'] ?? 'User'),
+                        subtitle: Text(userData['email'] ?? ''),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.close, size: 20),
+                          onPressed: () async {
+                            await doc.reference.delete();
+                            setState(() {});
+                          },
+                        ),
+                      );
+                    },
+                  );
+                }),
+              ],
+            ],
           );
         },
       );
