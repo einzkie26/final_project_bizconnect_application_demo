@@ -221,7 +221,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
                         widget.companyId != null
                             ? FirebaseFirestore.instance.collection('companies').doc(widget.companyId).get()
                             : FirebaseFirestore.instance.collection('chats').doc(_chatId).get().then((chat) async {
-                                final chatData = chat.data() as Map<String, dynamic>?;
+                                final chatData = chat.data();
                                 final companyId = chatData?['companyId'];
                                 if (companyId != null) {
                                   return await FirebaseFirestore.instance.collection('companies').doc(companyId).get();
