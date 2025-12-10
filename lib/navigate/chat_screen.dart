@@ -32,6 +32,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
   String? _chatId;
   final _currentUserId = FirebaseAuth.instance.currentUser?.uid;
   final List<XFile> _selectedImages = [];
+  final Map<String, DateTime> _invitationCooldowns = {};
+  DateTime? _lastInviteSentTime;
 
   @override
   void initState() {
@@ -383,40 +385,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
             icon: const Icon(Icons.call, color: Colors.white),
             onPressed: _initiateCall,
           ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert, color: Colors.white),
-            onSelected: (value) {
-              switch (value) {
-                case 'clear':
-                  _showClearChatDialog();
-                  break;
-                case 'block':
-                  _showBlockUserDialog();
-                  break;
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'clear',
-                child: Row(
-                  children: [
-                    Icon(Icons.clear_all, color: Colors.grey),
-                    SizedBox(width: 8),
-                    Text('Clear Chat'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'block',
-                child: Row(
-                  children: [
-                    Icon(Icons.block, color: Colors.red),
-                    SizedBox(width: 8),
-                    Text('Block User', style: TextStyle(color: Colors.red)),
-                  ],
-                ),
-              ),
-            ],
+          IconButton(
+            icon: const Icon(Icons.info_outline, color: Colors.white),
+            onPressed: _showChatInfo,
           ),
         ],
       ),
@@ -504,25 +475,71 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
                           ),
                         Align(
                           alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            constraints: BoxConstraints(
-                              maxWidth: MediaQuery.of(context).size.width * 0.75,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isMe ? Colors.deepPurple : Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.grey.withOpacity(0.1),
-                                  spreadRadius: 1,
-                                  blurRadius: 3,
-                                  offset: const Offset(0, 1),
+                          child: GestureDetector(
+                            onLongPress: () => _showMessageOptions(message),
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Container(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  constraints: BoxConstraints(
+                                    maxWidth: MediaQuery.of(context).size.width * 0.75,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isMe ? Colors.deepPurple : Colors.white,
+                                    borderRadius: BorderRadius.circular(20),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.grey.withOpacity(0.1),
+                                        spreadRadius: 1,
+                                        blurRadius: 3,
+                                        offset: const Offset(0, 1),
+                                      ),
+                                    ],
+                                  ),
+                                  child: _buildMessageContent(message, isMe),
+                                ),
+                                Positioned(
+                                  bottom: -4,
+                                  right: isMe ? 8 : null,
+                                  left: isMe ? null : 8,
+                                  child: FutureBuilder<DocumentSnapshot>(
+                                    future: FirebaseFirestore.instance
+                                        .collection('chats')
+                                        .doc(_chatId!)
+                                        .collection('messages')
+                                        .doc(message.id)
+                                        .get(),
+                                    builder: (context, snapshot) {
+                                      if (!snapshot.hasData) return const SizedBox();
+                                      final data = snapshot.data!.data() as Map<String, dynamic>?;
+                                      final reactions = data?['reactions'] as Map<String, dynamic>?;
+                                      if (reactions == null || reactions.isEmpty) return const SizedBox();
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(color: Colors.grey[300]!),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.grey.withOpacity(0.2),
+                                              blurRadius: 4,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: reactions.entries.map((e) => Text(e.value, style: const TextStyle(fontSize: 14))).toList(),
+                                        ),
+                                      );
+                                    },
+                                  ),
                                 ),
                               ],
                             ),
-                            child: _buildMessageContent(message, isMe),
                           ),
                         ),
                       ],
@@ -754,6 +771,106 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
     }
   }
 
+  void _showChatInfo() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        maxChildSize: 0.9,
+        minChildSize: 0.4,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: ListView(
+            controller: scrollController,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Chat Options',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.search, color: Colors.blue),
+                title: const Text('Search in Conversation'),
+                onTap: () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Search feature coming soon!')),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.notifications_off, color: Colors.orange),
+                title: const Text('Mute Notifications'),
+                onTap: () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Mute feature coming soon!')),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.color_lens, color: Colors.purple),
+                title: const Text('Change Theme'),
+                onTap: () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Theme feature coming soon!')),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.emoji_emotions, color: Colors.amber),
+                title: const Text('Change Emoji'),
+                onTap: () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Emoji feature coming soon!')),
+                  );
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.clear_all, color: Colors.grey),
+                title: const Text('Clear Chat'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showClearChatDialog();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.block, color: Colors.red),
+                title: const Text('Block User', style: TextStyle(color: Colors.red)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showBlockUserDialog();
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showClearChatDialog() {
     showDialog(
       context: context,
@@ -814,6 +931,136 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
         ],
       ),
     );
+  }
+
+  void _showMessageOptions(MessageModel message) {
+    final isMyMessage = message.senderId == _currentUserId;
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.emoji_emotions, color: Colors.orange),
+              title: const Text('React'),
+              onTap: () {
+                Navigator.pop(context);
+                _showEmojiPicker(message);
+              },
+            ),
+            if (isMyMessage) ...[
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: const Text('Unsend Message'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _unsendMessage(message);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_forever, color: Colors.red),
+                title: const Text('Delete for Me'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _deleteMessage(message);
+                },
+              ),
+            ] else
+              ListTile(
+                leading: const Icon(Icons.delete_forever, color: Colors.red),
+                title: const Text('Delete for Me'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _deleteMessage(message);
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEmojiPicker(MessageModel message) {
+    final emojis = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(16),
+        child: Wrap(
+          spacing: 16,
+          children: emojis.map((emoji) => GestureDetector(
+            onTap: () {
+              Navigator.pop(context);
+              _addReaction(message, emoji);
+            },
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(emoji, style: const TextStyle(fontSize: 24)),
+            ),
+          )).toList(),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _addReaction(MessageModel message, String emoji) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('chats')
+          .doc(_chatId!)
+          .collection('messages')
+          .doc(message.id)
+          .update({
+        'reactions.$_currentUserId': emoji,
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to add reaction'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  Future<void> _unsendMessage(MessageModel message) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('chats')
+          .doc(_chatId!)
+          .collection('messages')
+          .doc(message.id)
+          .delete();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Message unsent'), backgroundColor: Colors.green),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to unsend message'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  Future<void> _deleteMessage(MessageModel message) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('chats')
+          .doc(_chatId!)
+          .collection('messages')
+          .doc(message.id)
+          .delete();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Message deleted'), backgroundColor: Colors.green),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to delete message'), backgroundColor: Colors.red),
+      );
+    }
   }
 
   Widget _buildMessageContent(MessageModel message, bool isMe) {
@@ -1201,6 +1448,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
   }
   
   Future<void> _sendInvitationMessage(String companyId, String companyName) async {
+    if (_lastInviteSentTime != null) {
+      final cooldownEnd = _lastInviteSentTime!.add(const Duration(seconds: 20));
+      if (DateTime.now().isBefore(cooldownEnd)) {
+        final remaining = cooldownEnd.difference(DateTime.now()).inSeconds;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Please wait ${remaining}s before sending another invite'), backgroundColor: Colors.orange),
+        );
+        return;
+      }
+    }
+    
     if (!await _checkInternetConnection()) {
       _showConnectionError();
       return;
@@ -1209,7 +1467,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
     try {
       final messageText = 'You have been invited to join "$companyName" in the construction industry. Accept this invitation to become part of our team!';
       
-      // Send special invitation message
       final messageRef = FirebaseFirestore.instance
           .collection('chats')
           .doc(_chatId!)
@@ -1229,7 +1486,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
         'resolved': false,
       });
       
-      // Update chat's last message
       await FirebaseFirestore.instance
           .collection('chats')
           .doc(_chatId!)
@@ -1238,6 +1494,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
         'lastMessageTime': DateTime.now(),
         'lastSenderId': _currentUserId,
       });
+      
+      _lastInviteSentTime = DateTime.now();
       
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -1360,29 +1618,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
           ),
         ),
         const SizedBox(height: 8),
-        if (!isMe && !isResolved) ...[
-          Row(
-            children: [
-              ElevatedButton(
-                onPressed: () => _handleInvitationResponse(message.id, messageData, true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                ),
-                child: const Text('Accept', style: TextStyle(color: Colors.white, fontSize: 12)),
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: () => _handleInvitationResponse(message.id, messageData, false),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                ),
-                child: const Text('Decline', style: TextStyle(color: Colors.white, fontSize: 12)),
-              ),
-            ],
-          ),
-        ] else if (isResolved) ...[
+        if (!isMe && !isResolved) ..._buildInvitationButtons(message.id, messageData) else if (isResolved) ...[
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
@@ -1425,6 +1661,52 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
     );
   }
   
+  List<Widget> _buildInvitationButtons(String messageId, Map<String, dynamic> messageData) {
+    return [
+      StatefulBuilder(
+        builder: (context, setState) {
+          final cooldownEnd = _invitationCooldowns[messageId];
+          final isOnCooldown = cooldownEnd != null && DateTime.now().isBefore(cooldownEnd);
+          final remainingSeconds = isOnCooldown ? cooldownEnd.difference(DateTime.now()).inSeconds : 0;
+          
+          if (isOnCooldown) {
+            Future.delayed(const Duration(seconds: 1), () {
+              if (mounted) setState(() {});
+            });
+          }
+          
+          return Row(
+            children: [
+              ElevatedButton(
+                onPressed: isOnCooldown ? null : () {
+                  _invitationCooldowns[messageId] = DateTime.now().add(const Duration(seconds: 50));
+                  _handleInvitationResponse(messageId, messageData, true);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isOnCooldown ? Colors.grey : Colors.green,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                ),
+                child: Text(
+                  isOnCooldown ? '${remainingSeconds}s' : 'Accept',
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: isOnCooldown ? null : () => _handleInvitationResponse(messageId, messageData, false),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isOnCooldown ? Colors.grey : Colors.red,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                ),
+                child: const Text('Decline', style: TextStyle(color: Colors.white, fontSize: 12)),
+              ),
+            ],
+          );
+        },
+      ),
+    ];
+  }
+
   Future<void> _handleInvitationResponse(String messageId, Map<String, dynamic> messageData, bool accepted) async {
     if (!await _checkInternetConnection()) {
       _showConnectionError();

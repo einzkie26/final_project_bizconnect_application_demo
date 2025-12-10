@@ -30,6 +30,12 @@ class _CompanyDetailsPageState extends State<CompanyDetailsPage> {
     _checkFollowStatus();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _checkFollowStatus();
+  }
+
   void _loadOwnerInfo() async {
     try {
       final ownerDoc = await _firestore.collection('users').doc(widget.company.ownerId).get();

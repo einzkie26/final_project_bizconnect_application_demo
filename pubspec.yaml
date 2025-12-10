@@ -49,6 +49,7 @@ dependencies:
   http: ^1.1.0
   connectivity_plus: ^6.0.5
   url_launcher: ^6.2.4
+  fl_chart: ^0.68.0
 
 dev_dependencies:
   flutter_test:

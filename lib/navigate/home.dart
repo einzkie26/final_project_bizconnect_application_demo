@@ -135,6 +135,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           const SnackBar(content: Text('Following company!')),
         );
       }
+      setState(() {});
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: ${e.toString()}')),

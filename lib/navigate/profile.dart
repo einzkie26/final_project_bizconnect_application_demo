@@ -3,12 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../controllers/profile_controller.dart';
 import '../controllers/user_controller.dart';
 import '../models/company_model.dart';
+import '../models/user_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:async';
 import 'create_company_page.dart';
+import 'company_details_page.dart';
+import 'user_details_page.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -26,6 +30,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   List<CompanyModel> _userCompanies = [];
   String? _selectedCompanyId;
   bool _isPersonalMode = true;
+  DateTime? _lastInviteTime;
   
   @override
   void initState() {
@@ -1428,96 +1433,174 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
   
   void _showInviteDialog() {
+    if (_lastInviteTime != null) {
+      final cooldownEnd = _lastInviteTime!.add(const Duration(seconds: 20));
+      if (DateTime.now().isBefore(cooldownEnd)) {
+        final remaining = cooldownEnd.difference(DateTime.now()).inSeconds;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Please wait ${remaining}s before sending another invite'), backgroundColor: Colors.orange),
+        );
+        return;
+      }
+    }
+    
     final emailController = TextEditingController();
+    bool isLoading = false;
     
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Invite to Company'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: emailController,
-              decoration: const InputDecoration(
-                labelText: 'User Email',
-                prefixIcon: Icon(Icons.email),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Invite to Company'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: emailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  labelText: 'User Email',
+                  prefixIcon: Icon(Icons.email),
+                  border: OutlineInputBorder(),
+                ),
               ),
+              const SizedBox(height: 16),
+              const Text(
+                'User will be added as collaborator if they don\'t provide position and ID.',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              if (isLoading) ...[
+                const SizedBox(height: 16),
+                const CircularProgressIndicator(),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: isLoading ? null : () => Navigator.pop(context),
+              child: const Text('Cancel'),
             ),
-            const SizedBox(height: 16),
-            const Text(
-              'User will be added as collaborator if they don\'t provide position and ID.',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ElevatedButton(
+              onPressed: isLoading ? null : () async {
+                final email = emailController.text.trim();
+                if (email.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter an email'), backgroundColor: Colors.orange),
+                  );
+                  return;
+                }
+                if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter a valid email'), backgroundColor: Colors.orange),
+                  );
+                  return;
+                }
+                setState(() => isLoading = true);
+                final exists = await _checkEmailExists(email);
+                if (!exists) {
+                  setState(() => isLoading = false);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Email not found'), backgroundColor: Colors.red),
+                    );
+                  }
+                  return;
+                }
+                await _sendInvitation(email);
+                _lastInviteTime = DateTime.now();
+                setState(() => isLoading = false);
+                if (context.mounted) Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+              child: const Text('Send Invite', style: TextStyle(color: Colors.white)),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (emailController.text.isNotEmpty) {
-                await _sendInvitation(emailController.text);
-                Navigator.pop(context);
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-            child: const Text('Send Invite', style: TextStyle(color: Colors.white)),
-          ),
-        ],
       ),
     );
   }
   
-  Future<void> _sendInvitation(String email) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null || _selectedCompanyId == null) return;
-    
+  Future<bool> _checkEmailExists(String email) async {
     try {
-      // Find user by email
       final userQuery = await FirebaseFirestore.instance
           .collection('users')
           .where('email', isEqualTo: email)
-          .get();
+          .limit(1)
+          .get()
+          .timeout(const Duration(seconds: 10));
+      return userQuery.docs.isNotEmpty;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<void> _sendInvitation(String email) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || _selectedCompanyId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Invalid session'), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
+    
+    try {
+      final userQuery = await FirebaseFirestore.instance
+          .collection('users')
+          .where('email', isEqualTo: email.trim())
+          .limit(1)
+          .get()
+          .timeout(const Duration(seconds: 10));
       
       if (userQuery.docs.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('User not found'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('User not found'), backgroundColor: Colors.red),
+          );
+        }
         return;
       }
       
       final targetUserId = userQuery.docs.first.id;
       final targetUserName = userQuery.docs.first.data()['name'] ?? 'User';
       
-      // Get company name
       final companyDoc = await FirebaseFirestore.instance
           .collection('companies')
           .doc(_selectedCompanyId!)
-          .get();
+          .get()
+          .timeout(const Duration(seconds: 10));
+      
+      if (!companyDoc.exists) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Company not found'), backgroundColor: Colors.red),
+          );
+        }
+        return;
+      }
+      
       final companyName = companyDoc.data()!['name'];
       
-      // Send collaboration invitation message
       await _sendCollaborationMessage(targetUserId, targetUserName, companyName);
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Collaboration invitation sent!'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Invitation sent!'), backgroundColor: Colors.green),
+        );
+      }
+    } on TimeoutException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Request timeout. Check connection'), backgroundColor: Colors.red),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to send invitation: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
   
@@ -1525,21 +1608,18 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     
-    // Create or get chat ID
     final participants = [user.uid, targetUserId]..sort();
     final chatId = participants.join('_');
     
-    // Ensure chat exists
     await FirebaseFirestore.instance.collection('chats').doc(chatId).set({
       'participants': participants,
-      'createdAt': DateTime.now(),
+      'createdAt': FieldValue.serverTimestamp(),
       'lastMessage': 'Collaboration invitation for $companyName',
-      'lastMessageTime': DateTime.now(),
+      'lastMessageTime': FieldValue.serverTimestamp(),
       'type': 'company',
       'companyName': companyName,
-    }, SetOptions(merge: true));
+    }, SetOptions(merge: true)).timeout(const Duration(seconds: 10));
     
-    // Send collaboration message with confirmation buttons
     await FirebaseFirestore.instance
         .collection('chats')
         .doc(chatId)
@@ -1548,22 +1628,21 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       'chatId': chatId,
       'senderId': user.uid,
       'text': 'You have been invited to collaborate with $companyName. Do you accept this collaboration?',
-      'timestamp': DateTime.now(),
+      'timestamp': FieldValue.serverTimestamp(),
       'isRead': false,
       'messageType': 'collaboration_invite',
       'companyId': _selectedCompanyId,
       'companyName': companyName,
-    });
+    }).timeout(const Duration(seconds: 10));
     
-    // Send notification message
     await FirebaseFirestore.instance.collection('messages').add({
       'senderId': user.uid,
       'receiverId': targetUserId,
       'message': 'Company invitation: $_selectedCompanyId',
       'type': 'collaboration_invite',
-      'timestamp': DateTime.now(),
+      'timestamp': FieldValue.serverTimestamp(),
       'isRead': false,
-    });
+    }).timeout(const Duration(seconds: 10));
   }
   
   void _showRemoveCompanyDialog() async {
@@ -2019,7 +2098,15 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                           title: Text(companyData['name']),
                           subtitle: Text('Position: ${data['position']}'),
                           trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                          onTap: () => _showCompanyProfile(data['companyId']),
+                          onTap: () {
+                            if (companyData['ownerId'] == FirebaseAuth.instance.currentUser?.uid) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('This is your own company'), backgroundColor: Colors.orange),
+                              );
+                              return;
+                            }
+                            _showCompanyProfile(data['companyId']);
+                          },
                         ),
                       );
                     },
@@ -2042,102 +2129,15 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           .doc(companyId)
           .get();
       
+      if (!companyDoc.exists) return;
+      
       final companyData = companyDoc.data()!;
-      final photoUrl = companyData['photoUrl'];
-      final ownerId = companyData['ownerId'];
+      final company = CompanyModel.fromMap(companyData, companyId);
       
-      final ownerDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(ownerId)
-          .get();
-      
-      final ownerData = ownerDoc.data();
-      final ownerName = ownerData?['name'] ?? 'Unknown';
-      final ownerEmail = ownerData?['email'] ?? 'No email';
-      
-      showDialog(
-        context: context,
-        builder: (context) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (photoUrl != null)
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                    child: Image.network(
-                      photoUrl,
-                      height: 150,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        height: 150,
-                        color: Colors.deepPurple.withOpacity(0.1),
-                        child: const Icon(Icons.business, size: 60, color: Colors.deepPurple),
-                      ),
-                    ),
-                  ),
-                Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        companyData['name'],
-                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Description: ${companyData['description'] ?? 'No description'}',
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Company Creator:',
-                              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue),
-                            ),
-                            const SizedBox(height: 4),
-                            Text('Name: $ownerName'),
-                            Text('Email: $ownerEmail'),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Created: ${companyData['createdAt'].toDate().toString().split(' ')[0]}',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.deepPurple,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      child: const Text('Close', style: TextStyle(color: Colors.white)),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CompanyDetailsPage(company: company),
         ),
       );
     } catch (e) {
@@ -2194,6 +2194,24 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   
 
   
+  Future<List<DocumentSnapshot>> _filterChatsWithReceivedMessages(List<QueryDocumentSnapshot> chats, String userId) async {
+    final filtered = <DocumentSnapshot>[];
+    for (var chat in chats) {
+      final messages = await FirebaseFirestore.instance
+          .collection('chats')
+          .doc(chat.id)
+          .collection('messages')
+          .limit(10)
+          .get();
+      
+      final hasReceivedMessage = messages.docs.any((msg) => msg.data()['senderId'] != userId);
+      if (hasReceivedMessage) {
+        filtered.add(chat);
+      }
+    }
+    return filtered;
+  }
+  
   Future<int> _getConnectionsCount() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return 0;
@@ -2204,7 +2222,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           .where('participants', arrayContains: user.uid)
           .get();
       
-      return chats.docs.length;
+      final filtered = await _filterChatsWithReceivedMessages(chats.docs, user.uid);
+      return filtered.length;
     } catch (e) {
       return 0;
     }
@@ -2311,27 +2330,46 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         builder: (context, snapshot) {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
           
-          final chats = snapshot.data!.docs;
-          if (chats.isEmpty) {
-            return const Center(child: Text('No connections yet'));
-          }
-          
-          return ListView.builder(
-            controller: scrollController,
-            itemCount: chats.length,
-            itemBuilder: (context, index) {
-              final chatData = chats[index].data() as Map<String, dynamic>;
-              final participants = List<String>.from(chatData['participants'] ?? []);
-              final otherUserId = participants.firstWhere((id) => id != user.uid, orElse: () => '');
-              final chatType = chatData['type'] ?? 'personal';
+          return FutureBuilder<List<DocumentSnapshot>>(
+            future: _filterChatsWithReceivedMessages(snapshot.data!.docs, user.uid),
+            builder: (context, filteredSnapshot) {
+              if (!filteredSnapshot.hasData) return const Center(child: CircularProgressIndicator());
+              
+              final chats = filteredSnapshot.data!;
+              if (chats.isEmpty) {
+                return const Center(child: Text('No connections yet'));
+              }
+              
+              return ListView.builder(
+                controller: scrollController,
+                itemCount: chats.length,
+                itemBuilder: (context, index) {
+                  final chatData = chats[index].data() as Map<String, dynamic>;
+                  final participants = List<String>.from(chatData['participants'] ?? []);
+                  final otherUserId = participants.firstWhere((id) => id != user.uid, orElse: () => '');
+                  final chatType = chatData['type'] ?? 'personal';
               
               if (chatType == 'company') {
                 final companyId = chatData['companyId'];
-                return FutureBuilder<DocumentSnapshot>(
-                  future: FirebaseFirestore.instance.collection('companies').doc(companyId).get(),
-                  builder: (context, companySnapshot) {
-                    if (!companySnapshot.hasData) return const SizedBox();
-                    final companyData = companySnapshot.data!.data() as Map<String, dynamic>?;
+                if (companyId == null) return const SizedBox();
+                return FutureBuilder<List<dynamic>>(
+                  future: Future.wait([
+                    FirebaseFirestore.instance.collection('companies').doc(companyId).get().timeout(const Duration(seconds: 5)),
+                    FirebaseFirestore.instance.collection('users').doc(otherUserId).get().timeout(const Duration(seconds: 5)),
+                  ]).catchError((e) => []),
+                  builder: (context, futureSnapshot) {
+                    if (!futureSnapshot.hasData || futureSnapshot.data!.isEmpty) {
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.blue.withOpacity(0.1),
+                          child: const Icon(Icons.business, color: Colors.blue),
+                        ),
+                        title: const Text('Company Chat'),
+                        subtitle: const Text('Loading...'),
+                      );
+                    }
+                    final companyData = futureSnapshot.data![0].data() as Map<String, dynamic>?;
+                    final senderData = futureSnapshot.data![1].data() as Map<String, dynamic>?;
                     if (companyData == null) return const SizedBox();
                     
                     return ListTile(
@@ -2340,8 +2378,17 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                         child: const Icon(Icons.business, color: Colors.blue),
                       ),
                       title: Text(companyData['name']),
-                      subtitle: const Text('Company Chat'),
+                      subtitle: Text('From: ${senderData?['name'] ?? 'Unknown'}'),
                       trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                      onTap: () {
+                        if (companyData['ownerId'] == user.uid) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('This is your own company'), backgroundColor: Colors.orange),
+                          );
+                          return;
+                        }
+                        _showCompanyProfile(companyId);
+                      },
                     );
                   },
                 );
@@ -2364,10 +2411,27 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                       title: Text(userData['name'] ?? 'User'),
                       subtitle: const Text('Personal Chat'),
                       trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                      onTap: () {
+                        if (otherUserId == user.uid) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('This is your own profile'), backgroundColor: Colors.orange),
+                          );
+                          return;
+                        }
+                        final userModel = UserModel.fromMap(userData, otherUserId);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => UserDetailsPage(user: userModel),
+                          ),
+                        );
+                      },
                     );
                   },
                 );
               }
+                },
+              );
             },
           );
         },
@@ -2421,13 +2485,22 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                         ),
                         title: Text(companyData['name']),
                         subtitle: Text(companyData['industry'] ?? 'Company'),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.close, size: 20),
+                        trailing: TextButton(
                           onPressed: () async {
                             await doc.reference.delete();
-                            setState(() {});
+                            if (mounted) setState(() {});
                           },
+                          child: const Text('Unfollow', style: TextStyle(color: Colors.red)),
                         ),
+                        onTap: () {
+                          if (companyData['ownerId'] == user.uid) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('This is your own company'), backgroundColor: Colors.orange),
+                            );
+                            return;
+                          }
+                          _showCompanyProfile(followData['companyId']);
+                        },
                       );
                     },
                   );
@@ -2460,13 +2533,28 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                         ),
                         title: Text(userData['name'] ?? 'User'),
                         subtitle: Text(userData['email'] ?? ''),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.close, size: 20),
+                        trailing: TextButton(
                           onPressed: () async {
                             await doc.reference.delete();
-                            setState(() {});
+                            if (mounted) setState(() {});
                           },
+                          child: const Text('Unfollow', style: TextStyle(color: Colors.red)),
                         ),
+                        onTap: () {
+                          if (followData['followingId'] == user.uid) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('This is your own profile'), backgroundColor: Colors.orange),
+                            );
+                            return;
+                          }
+                          final userModel = UserModel.fromMap(userData, followData['followingId']);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => UserDetailsPage(user: userModel),
+                            ),
+                          );
+                        },
                       );
                     },
                   );
@@ -2525,6 +2613,21 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     title: Text(userData['name'] ?? 'Unknown'),
                     subtitle: Text('Following: ${followerData['companyName']}'),
                     trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    onTap: () {
+                      if (followerData['followerId'] == user.uid) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('This is your own profile'), backgroundColor: Colors.orange),
+                        );
+                        return;
+                      }
+                      final userModel = UserModel.fromMap(userData, followerData['followerId']);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => UserDetailsPage(user: userModel),
+                        ),
+                      );
+                    },
                   );
                 },
               );

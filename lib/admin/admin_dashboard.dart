@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'admin_auth_service.dart';
+import 'admin_users_page.dart';
+import 'admin_companies_page.dart';
+import 'admin_chats_page.dart';
+import 'admin_analytics_page.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -110,10 +115,19 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     child: Row(
                       children: [
                         Expanded(
-                          child: _buildLargeCard(
-                            'Total Entrepreneurs',
-                            '1,234',
-                            Colors.grey[300]!,
+                          child: FutureBuilder<QuerySnapshot>(
+                            future: FirebaseFirestore.instance.collection('users').get(),
+                            builder: (context, snapshot) {
+                              final count = snapshot.hasData ? snapshot.data!.docs.length : 0;
+                              return InkWell(
+                                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminUsersPage())),
+                                child: _buildLargeCard(
+                                  'Total Users',
+                                  '$count',
+                                  Colors.blue[100]!,
+                                ),
+                              );
+                            },
                           ),
                         ),
                       ],
@@ -125,10 +139,19 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     child: Row(
                       children: [
                         Expanded(
-                          child: _buildLargeCard(
-                            'Connection Statistics',
-                            '89 Active',
-                            Colors.grey[300]!,
+                          child: FutureBuilder<QuerySnapshot>(
+                            future: FirebaseFirestore.instance.collection('companies').get(),
+                            builder: (context, snapshot) {
+                              final count = snapshot.hasData ? snapshot.data!.docs.length : 0;
+                              return InkWell(
+                                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminCompaniesPage())),
+                                child: _buildLargeCard(
+                                  'Total Companies',
+                                  '$count',
+                                  Colors.green[100]!,
+                                ),
+                              );
+                            },
                           ),
                         ),
                       ],
@@ -137,21 +160,42 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   const SizedBox(height: 16),
                   
                   // Small Cards Row
+                  const SizedBox(height: 16),
                   Expanded(
                     flex: 2,
                     child: Row(
                       children: [
                         Expanded(
-                          child: _buildSmallCard(
-                            'Reports Summary',
-                            Colors.grey[300]!,
+                          child: FutureBuilder<QuerySnapshot>(
+                            future: FirebaseFirestore.instance.collection('chats').get(),
+                            builder: (context, snapshot) {
+                              final count = snapshot.hasData ? snapshot.data!.docs.length : 0;
+                              return InkWell(
+                                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminChatsPage())),
+                                child: _buildSmallCard(
+                                  'Total Chats',
+                                  '$count',
+                                  Colors.purple[100]!,
+                                ),
+                              );
+                            },
                           ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
-                          child: _buildSmallCard(
-                            'Pie chart sa report',
-                            Colors.grey[300]!,
+                          child: FutureBuilder<QuerySnapshot>(
+                            future: FirebaseFirestore.instance.collection('follows').get(),
+                            builder: (context, snapshot) {
+                              final count = snapshot.hasData ? snapshot.data!.docs.length : 0;
+                              return InkWell(
+                                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminAnalyticsPage())),
+                                child: _buildSmallCard(
+                                  'Total Connections',
+                                  '$count',
+                                  Colors.orange[100]!,
+                                ),
+                              );
+                            },
                           ),
                         ),
                       ],
@@ -184,16 +228,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
             label: 'Users',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.payment),
-            label: 'Payments',
+            icon: Icon(Icons.chat),
+            label: 'Chats',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.bar_chart),
             label: 'Reports',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
-            label: 'Settings',
+            icon: Icon(Icons.business),
+            label: 'Companies',
           ),
         ],
       ),
@@ -235,7 +279,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _buildSmallCard(String title, Color color) {
+  Widget _buildSmallCard(String title, String subtitle, Color color) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -254,6 +298,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
               color: Colors.black87,
             ),
           ),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.black54,
+            ),
+          ),
         ],
       ),
     );
@@ -262,19 +315,18 @@ class _AdminDashboardState extends State<AdminDashboard> {
   void _navigateToPage(int index) {
     switch (index) {
       case 0:
-        // Already on dashboard
         break;
       case 1:
-        Navigator.pushNamed(context, '/admin/users');
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminUsersPage()));
         break;
       case 2:
-        // Navigate to payments page (create if needed)
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminChatsPage()));
         break;
       case 3:
-        Navigator.pushNamed(context, '/admin/reports');
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminAnalyticsPage()));
         break;
       case 4:
-        Navigator.pushNamed(context, '/admin/settings');
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminCompaniesPage()));
         break;
     }
   }

@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_model.dart';
+import '../models/company_model.dart';
 import 'chat_screen.dart';
+import 'company_details_page.dart';
+import 'user_details_page.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
@@ -45,38 +48,27 @@ class _SearchPageState extends State<SearchPage> {
 
     try {
       final currentUserId = _auth.currentUser?.uid;
+      final searchLower = query.toLowerCase();
       
-      // Search users by name
-      final userQuery = await _firestore
-          .collection('users')
-          .where('name', isGreaterThanOrEqualTo: query)
-          .where('name', isLessThan: '${query}z')
-          .limit(10)
-          .get();
+      // Get all users and companies, then filter locally
+      final allUsers = await _firestore.collection('users').get();
+      final allCompanies = await _firestore.collection('companies').get();
 
-      // Search users by location
-      final locationQuery = await _firestore
-          .collection('users')
-          .where('location', isGreaterThanOrEqualTo: query)
-          .where('location', isLessThan: '${query}z')
-          .limit(10)
-          .get();
-
-      // Search companies
-      final companyQuery = await _firestore
-          .collection('companies')
-          .where('name', isGreaterThanOrEqualTo: query)
-          .where('name', isLessThan: '${query}z')
-          .limit(10)
-          .get();
-
-      final userResults = [...userQuery.docs, ...locationQuery.docs]
+      final userResults = allUsers.docs
           .map((doc) => UserModel.fromMap(doc.data(), doc.id))
-          .where((user) => user.id != currentUserId)
-          .toSet()
+          .where((user) {
+            if (user.id == currentUserId) return false;
+            final nameLower = user.name.toLowerCase();
+            final locationLower = (user.location ?? '').toLowerCase();
+            return nameLower.contains(searchLower) || locationLower.contains(searchLower);
+          })
           .toList();
 
-      final companyResults = companyQuery.docs
+      final companyResults = allCompanies.docs
+          .where((doc) {
+            final name = (doc.data()['name'] ?? '').toString().toLowerCase();
+            return name.contains(searchLower);
+          })
           .map((doc) => {
             'type': 'company',
             'id': doc.id,
@@ -139,7 +131,6 @@ class _SearchPageState extends State<SearchPage> {
     }
     
     try {
-      // Check if already following
       final existingFollow = await _firestore
           .collection('follows')
           .where('followerId', isEqualTo: currentUserId)
@@ -159,9 +150,7 @@ class _SearchPageState extends State<SearchPage> {
         'createdAt': DateTime.now(),
       });
       
-      setState(() {
-        _followingUsers.add(userId);
-      });
+      await _loadFollowingUsers();
       
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -243,9 +232,7 @@ class _SearchPageState extends State<SearchPage> {
         await doc.reference.delete();
       }
       
-      setState(() {
-        _followingUsers.remove(userId);
-      });
+      await _loadFollowingUsers();
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -287,9 +274,7 @@ class _SearchPageState extends State<SearchPage> {
         'createdAt': DateTime.now(),
       });
       
-      setState(() {
-        _followingCompanies.add(companyId);
-      });
+      await _loadFollowingUsers();
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -320,9 +305,7 @@ class _SearchPageState extends State<SearchPage> {
         await doc.reference.delete();
       }
       
-      setState(() {
-        _followingCompanies.remove(companyId);
-      });
+      await _loadFollowingUsers();
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -884,355 +867,101 @@ class _SearchPageState extends State<SearchPage> {
     );
   }
   
-  void _showCompanyProfile(Map<String, dynamic> company) {
+  void _showCompanyProfile(Map<String, dynamic> company) async {
     _addToRecentSearches(company['name']);
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.8,
-        maxChildSize: 0.9,
-        minChildSize: 0.5,
-        builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Text(
-                      company['name'],
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  controller: scrollController,
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Colors.blue.withOpacity(0.1), Colors.blue.withOpacity(0.05)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.blue.withOpacity(0.2)),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 80,
-                              height: 80,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Colors.blue.withOpacity(0.3), width: 2),
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(14),
-                                child: company['photoUrl'] != null
-                                    ? Image.network(
-                                        company['photoUrl'],
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => Container(
-                                          color: Colors.blue.withOpacity(0.2),
-                                          child: const Icon(Icons.business, color: Colors.blue, size: 40),
-                                        ),
-                                      )
-                                    : Container(
-                                        color: Colors.blue.withOpacity(0.2),
-                                        child: const Icon(Icons.business, color: Colors.blue, size: 40),
-                                      ),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(company['name'], style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                                  Text(company['industry'], style: const TextStyle(fontSize: 14, color: Colors.blue)),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.group, size: 14, color: Colors.grey),
-                                      const SizedBox(width: 4),
-                                      Text('${(company['memberIds'] as List?)?.length ?? 0} members', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[50],
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey.withOpacity(0.2)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.blue,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: const Icon(Icons.info, color: Colors.white, size: 18),
-                                ),
-                                const SizedBox(width: 12),
-                                const Text('About', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue)),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Text(company['description'] ?? 'No description available', style: const TextStyle(fontSize: 14)),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.05),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.green.withOpacity(0.2)),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: StatefulBuilder(
-                                builder: (context, setModalState) => ElevatedButton.icon(
-                                  onPressed: () {
-                                    if (_followingCompanies.contains(company['id'])) {
-                                      _unfollowCompany(company['id']);
-                                    } else {
-                                      _followCompany(company['id']);
-                                    }
-                                    setModalState(() {});
-                                    setState(() {});
-                                  },
-                                  icon: Icon(
-                                    _followingCompanies.contains(company['id']) ? Icons.check : Icons.favorite_border,
-                                    size: 18,
-                                  ),
-                                  label: Text(_followingCompanies.contains(company['id']) ? 'Following' : 'Follow'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: _followingCompanies.contains(company['id']) ? Colors.green : Colors.blue,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: FutureBuilder<DocumentSnapshot>(
-                                future: _firestore.collection('users').doc(company['ownerId']).get(),
-                                builder: (context, snapshot) {
-                                  if (!snapshot.hasData) {
-                                    return ElevatedButton.icon(
-                                      onPressed: null,
-                                      icon: const Icon(Icons.message, size: 18),
-                                      label: const Text('Message'),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.deepPurple,
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(vertical: 12),
-                                      ),
-                                    );
-                                  }
-                                  final ownerData = snapshot.data!.data() as Map<String, dynamic>?;
-                                  return ElevatedButton.icon(
-                                    onPressed: () {
-                                      Navigator.pop(context);
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => ChatScreen(
-                                            otherUserId: company['ownerId'],
-                                            otherUserName: company['name'],
-                                            chatType: 'company',
-                                            companyId: company['id'],
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    icon: const Icon(Icons.message, size: 18),
-                                    label: const Text('Message'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.deepPurple,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      FutureBuilder<DocumentSnapshot>(
-                        future: _firestore.collection('users').doc(company['ownerId']).get(),
-                        builder: (context, snapshot) {
-                          if (!snapshot.hasData) return const SizedBox();
-                          final ownerData = snapshot.data!.data() as Map<String, dynamic>?;
-                          if (ownerData == null) return const SizedBox();
-                          
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Owner', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 8),
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.person, color: Colors.blue),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(ownerData['name'] ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                          Text(ownerData['email'] ?? 'No email', style: TextStyle(color: Colors.grey[600])),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      FutureBuilder<QuerySnapshot>(
-                        future: _firestore.collection('company_members').where('companyId', isEqualTo: company['id']).get(),
-                        builder: (context, snapshot) {
-                          if (!snapshot.hasData) return const SizedBox();
-                          final members = snapshot.data!.docs;
-                          
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Members (${members.length})', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 8),
-                              ...members.map((doc) {
-                                final data = doc.data() as Map<String, dynamic>;
-                                return FutureBuilder<DocumentSnapshot>(
-                                  future: _firestore.collection('users').doc(data['userId']).get(),
-                                  builder: (context, userSnapshot) {
-                                    if (!userSnapshot.hasData) return const SizedBox();
-                                    final userData = userSnapshot.data!.data() as Map<String, dynamic>?;
-                                    if (userData == null) return const SizedBox();
-                                    
-                                    return Container(
-                                      margin: const EdgeInsets.only(bottom: 8),
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey[100],
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          const Icon(Icons.person, color: Colors.deepPurple),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(userData['name'] ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                                Text('Position: ${data['position'] ?? 'Member'}', style: TextStyle(color: Colors.grey[600])),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  },
-                                );
-                              }),
-                            ],
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
+    try {
+      final companyModel = CompanyModel(
+        id: company['id'],
+        name: company['name'],
+        description: company['description'] ?? '',
+        industry: company['industry'] ?? '',
+        ownerId: company['ownerId'],
+        memberIds: List<String>.from(company['memberIds'] ?? []),
+        createdAt: DateTime.now(),
+      );
+      
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CompanyDetailsPage(company: companyModel),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to load company details'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Widget _buildSearchResultCard(UserModel user) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.grey[200]!,
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => UserDetailsPage(user: user),
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.deepPurple.withOpacity(0.3), width: 2),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.grey[200]!,
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              spreadRadius: 1,
+              blurRadius: 4,
+              offset: const Offset(0, 2),
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: user.profilePicUrl != null
-                  ? Image.network(
-                      user.profilePicUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.deepPurple.withOpacity(0.3), width: 2),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: user.profilePicUrl != null
+                    ? Image.network(
+                        user.profilePicUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.deepPurple.withOpacity(0.8),
+                                Colors.purple.withOpacity(0.6),
+                              ],
+                            ),
+                          ),
+                          child: Center(
+                            child: Text(
+                              user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 24,
+                              ),
+                            ),
+                          ),
+                        ),
+                      )
+                    : Container(
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
@@ -1252,52 +981,28 @@ class _SearchPageState extends State<SearchPage> {
                           ),
                         ),
                       ),
-                    )
-                  : Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.deepPurple.withOpacity(0.8),
-                            Colors.purple.withOpacity(0.6),
-                          ],
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 24,
-                          ),
-                        ),
-                      ),
-                    ),
+              ),
             ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      flex: 3,
-                      child: Text(
-                        user.name,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          user.name,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      flex: 1,
-                      child: Container(
+                      const SizedBox(width: 8),
+                      Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 6,
                           vertical: 4,
@@ -1316,56 +1021,58 @@ class _SearchPageState extends State<SearchPage> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  user.bio ?? user.email,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[600],
-                    height: 1.3,
+                    ],
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.location_on_outlined,
-                      size: 14,
-                      color: Colors.grey[500],
+                  const SizedBox(height: 4),
+                  Text(
+                    user.bio ?? user.email,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey[600],
+                      height: 1.3,
                     ),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        user.location ?? 'No location',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on_outlined,
+                        size: 14,
+                        color: Colors.grey[500],
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          user.location ?? 'No location',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    TextButton(
-                      onPressed: () => _showUserProfile(user),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        backgroundColor: Colors.deepPurple,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        minimumSize: Size.zero,
-                      ),
-                      child: const Text('View', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+            IconButton(
+              onPressed: () {
+                if (_followingUsers.contains(user.id)) {
+                  _unfollowUser(user.id);
+                } else {
+                  _followUser(user.id);
+                }
+              },
+              icon: Icon(
+                _followingUsers.contains(user.id) ? Icons.person_remove : Icons.person_add,
+                color: _followingUsers.contains(user.id) ? Colors.green : Colors.grey,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1466,67 +1173,66 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   Widget _buildCompanyResultCard(Map<String, dynamic> company) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.blue.withOpacity(0.3), width: 2),
+    return GestureDetector(
+      onTap: () => _showCompanyProfile(company),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey[200]!, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              spreadRadius: 1,
+              blurRadius: 4,
+              offset: const Offset(0, 2),
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: company['photoUrl'] != null
-                  ? Image.network(
-                      company['photoUrl'],
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue.withOpacity(0.3), width: 2),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: company['photoUrl'] != null
+                    ? Image.network(
+                        company['photoUrl'],
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: Colors.blue.withOpacity(0.1),
+                          child: const Icon(Icons.business, color: Colors.blue, size: 30),
+                        ),
+                      )
+                    : Container(
                         color: Colors.blue.withOpacity(0.1),
                         child: const Icon(Icons.business, color: Colors.blue, size: 30),
                       ),
-                    )
-                  : Container(
-                      color: Colors.blue.withOpacity(0.1),
-                      child: const Icon(Icons.business, color: Colors.blue, size: 30),
-                    ),
+              ),
             ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      flex: 3,
-                      child: Text(
-                        company['name'],
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
-                        overflow: TextOverflow.ellipsis,
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          company['name'],
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      flex: 1,
-                      child: Container(
+                      const SizedBox(width: 8),
+                      Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                         decoration: BoxDecoration(
                           color: Colors.blue.withOpacity(0.1),
@@ -1538,45 +1244,44 @@ class _SearchPageState extends State<SearchPage> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  company['description'] ?? 'No description',
-                  style: TextStyle(fontSize: 13, color: Colors.grey[600], height: 1.3),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(Icons.group, size: 14, color: Colors.grey[500]),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    company['description'] ?? 'No description',
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600], height: 1.3),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.group, size: 14, color: Colors.grey[500]),
+                      const SizedBox(width: 4),
+                      Text(
                         '${(company['memberIds'] as List?)?.length ?? 0} members',
                         style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    TextButton(
-                      onPressed: () => _showCompanyProfile(company),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        backgroundColor: Colors.blue,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        minimumSize: Size.zero,
-                      ),
-                      child: const Text('View', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+            IconButton(
+              onPressed: () {
+                if (_followingCompanies.contains(company['id'])) {
+                  _unfollowCompany(company['id']);
+                } else {
+                  _followCompany(company['id']);
+                }
+              },
+              icon: Icon(
+                _followingCompanies.contains(company['id']) ? Icons.favorite : Icons.favorite_border,
+                color: _followingCompanies.contains(company['id']) ? Colors.red : Colors.grey,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -17,6 +17,7 @@ class MessagesPage extends ConsumerStatefulWidget {
 
 class _MessagesPageState extends ConsumerState<MessagesPage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final Map<String, DateTime> _invitationCooldowns = {};
   
   @override
   void initState() {
@@ -300,6 +301,7 @@ class _MessagesPageState extends ConsumerState<MessagesPage> with SingleTickerPr
                   }
                   
                   return ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.all(16),
                     itemCount: chats.length,
                     itemBuilder: (context, index) {
@@ -535,6 +537,7 @@ class _MessagesPageState extends ConsumerState<MessagesPage> with SingleTickerPr
         }
         
         return ListView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),
           itemCount: companyChats.length,
           itemBuilder: (context, index) {
@@ -748,40 +751,72 @@ class _MessagesPageState extends ConsumerState<MessagesPage> with SingleTickerPr
         
         final companyData = companySnapshot.data!.data() as Map<String, dynamic>;
         
-        return Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.blue.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.blue.withOpacity(0.3)),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.business, color: Colors.blue, size: 24),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'You are invited to join',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                    ),
-                    Text(
-                      companyData['name'],
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
+        return StatefulBuilder(
+          builder: (context, setState) {
+            final cooldownEnd = _invitationCooldowns[doc.id];
+            final isOnCooldown = cooldownEnd != null && DateTime.now().isBefore(cooldownEnd);
+            final remainingSeconds = isOnCooldown ? cooldownEnd.difference(DateTime.now()).inSeconds : 0;
+            
+            if (isOnCooldown) {
+              Future.delayed(const Duration(seconds: 1), () {
+                if (mounted) setState(() {});
+              });
+            }
+            
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue.withOpacity(0.3)),
               ),
-              ElevatedButton(
-                onPressed: () => _showJoinCompanyDialog(context, companyId, companyData['name'], doc.id),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-                child: const Text('Join', style: TextStyle(color: Colors.white)),
+              child: Row(
+                children: [
+                  const Icon(Icons.business, color: Colors.blue, size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'You are invited to join',
+                          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                        ),
+                        Text(
+                          companyData['name'],
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextButton(
+                        onPressed: isOnCooldown ? null : () => _declineInvitation(doc.id),
+                        child: Text('Decline', style: TextStyle(color: isOnCooldown ? Colors.grey : Colors.red)),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: isOnCooldown ? null : () {
+                          _invitationCooldowns[doc.id] = DateTime.now().add(const Duration(seconds: 50));
+                          _showJoinCompanyDialog(context, companyId, companyData['name'], doc.id);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isOnCooldown ? Colors.grey : Colors.blue,
+                        ),
+                        child: Text(
+                          isOnCooldown ? '${remainingSeconds}s' : 'Join',
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -841,6 +876,23 @@ class _MessagesPageState extends ConsumerState<MessagesPage> with SingleTickerPr
     );
   }
   
+  Future<void> _declineInvitation(String messageId) async {
+    try {
+      await FirebaseFirestore.instance.collection('messages').doc(messageId).update({'isRead': true});
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Invitation declined'), backgroundColor: Colors.orange),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to decline'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   Future<void> _submitJoinRequest(BuildContext context, String companyId, String companyName, String position, String idNumber, String messageId) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
